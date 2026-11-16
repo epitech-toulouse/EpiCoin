@@ -1,0 +1,29 @@
+# EpiCoin services.
+#
+# For now only Postgres, used for development and tests:
+#   docker compose up -d postgres
+# The node, API and web services are added in phase 6.
+
+name: epicoin
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${EPICOIN_POSTGRES_USER:-epicoin}
+      POSTGRES_PASSWORD: ${EPICOIN_POSTGRES_PASSWORD:-epicoin}
+      POSTGRES_DB: ${EPICOIN_POSTGRES_DB:-epicoin}
+    ports:
+      # 5433 on the host by default: 5432 is often taken by another project.
+      - "127.0.0.1:${EPICOIN_POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${EPICOIN_POSTGRES_USER:-epicoin} -d ${EPICOIN_POSTGRES_DB:-epicoin}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  postgres-data:

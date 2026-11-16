@@ -51,3 +51,27 @@ Choix non imposés par la spécification, avec leur raison. À compléter au fil
 | N11 | Un réplica est le même binaire sans clé de validateur, avec `--upstream`. Il revérifie chaque bloc avant de le stocker et s'arrête au premier bloc invalide. | Un réplica synchronisé est un audit continu de la chaîne. |
 | N12 | `epicoin-cli genesis` refuse d'écraser un `genesis.json` ou un `keys.env` existant, et écrit `keys.env` en mode 0600. | Écraser les clés d'une chaîne en service serait irréversible. |
 | N13 | Index des transactions par adresse dans redb (`address_txs`). | Nécessaire à l'explorateur ; reconstruit à partir des blocs, donc jamais une source de vérité. |
+
+## API (`epicoin-api`)
+
+| # | Décision | Raison |
+|---|---|---|
+| A1 | Toute transaction signée par l'API est enregistrée dans `chain_txs` (avec ses octets signés) **avant** l'envoi au nœud ; un réconciliateur renvoie les mêmes octets jusqu'à inclusion ou refus définitif. | Un retry, un crash ou un redémarrage du nœud ne peut jamais appliquer deux fois une transaction : le nonce ne change pas. |
+| A2 | Les nonces sont alloués sous un verrou par signataire, en mémoire. L'API tourne en **une seule instance**. | Simple et suffisant ; plusieurs instances demanderaient un verrou Postgres. |
+| A3 | Sessions : jeton aléatoire opaque dans un cookie `HttpOnly` + `SameSite=Lax` (+ `Secure`), stocké hashé. Durée fixe (7 jours par défaut). | Standard, révocable côté serveur ; une fuite de la table ne donne pas de session utilisable. |
+| A4 | CSRF par jeton synchronisé : l'en-tête `X-CSRF-Token` est exigé sur toute requête modifiante d'un utilisateur connecté. | Indépendant du comportement `SameSite` des navigateurs. |
+| A5 | Les liens envoyés par email portent leur jeton dans le **fragment** d'URL (`/activation#token=…`) et l'API ne reçoit les jetons que dans le corps des requêtes. | Les URL finissent dans les journaux d'accès (nginx, traces) ; le fragment n'est jamais envoyé au serveur. Vérifié par un test. |
+| A6 | Limitation de débit en mémoire : 5 tentatives de connexion par compte et 30 par adresse cliente sur 15 minutes ; 3 demandes de réinitialisation par compte par heure. | Suffisant pour une instance unique ; perdre les compteurs au redémarrage est sans gravité. |
+| A7 | Mot de passe : 10 caractères minimum, Argon2id avec les paramètres par défaut de la crate, calculé hors des threads asynchrones. | Recommandation OWASP courante ; pas de règles de composition. |
+| A8 | Clés des wallets chiffrées en XChaCha20-Poly1305, l'identifiant du propriétaire en donnée associée ; chaque ligne porte l'empreinte de la clé maître utilisée. | Un chiffré copié sur un autre compte ne se déchiffre pas ; la rotation sait quelle clé relire. |
+| A9 | Rotation de la clé maître : nouvelle clé dans `EPICOIN_MASTER_KEY`, ancienne dans `EPICOIN_MASTER_KEY_PREVIOUS`, puis `epicoin-api rotate-master-key` (tout ou rien). | Procédure courte, rejouable sans risque. |
+| A10 | L'autorité de mint on-chain suit le rôle `staff` : Postgres exprime l'intention, `authority::sync_user` l'applique tout de suite et `sync_all` la rattrape toutes les 5 minutes. | Le système converge seul si le nœud était injoignable au moment d'un changement de rôle. |
+| A11 | Seul le rôle `staff` peut distribuer. Un admin qui encadre aussi a besoin d'un second compte `staff`. | Un rôle par utilisateur, comme dans la spec ; garde la clé d'un admin hors du mint. |
+| A12 | Une distribution est validée en entier avant tout envoi (destinataires, quota restant) ; l'en-tête `Idempotency-Key` rend un double clic sans effet. | Tout ou rien du point de vue de l'encadrant. |
+| A13 | Le motif (`reason_code`) va sur la chaîne ; le commentaire libre reste dans `mint_batches`. | RGPD : aucun texte libre on-chain (vérifié par un test qui inspecte les blocs). |
+| A14 | Suppression d'un utilisateur : la ligne `users` est effacée (cascade sur wallet, sessions, jetons) ; `chain_txs` et `audit_log` gardent des références mises à `NULL`. Le journal d'audit conserve l'identifiant opaque de ce qui a été supprimé. | Efface identité et clé privée ; l'identifiant restant ne désigne plus personne et prouve la suppression. Les EPC restants sur l'adresse deviennent indépensables. |
+| A15 | Les détails du journal d'audit ne contiennent que des identifiants, des compteurs et des codes. | Pas de donnée personnelle à purger dans l'audit. |
+| A16 | Import CSV : tout ou rien si une ligne est invalide ; les emails déjà connus sont ignorés ; invitations et autorités partent en tâche de fond. | Pas d'import à moitié fait ; la requête de l'admin ne dépend pas de 150 envois d'email. |
+| A17 | Requêtes `sqlx` vérifiées à l'exécution (pas de macros `query!`) ; migrations embarquées et appliquées au démarrage. | Le projet compile sans base de données ; les requêtes sont couvertes par les tests d'intégration. |
+| A18 | Le mailer de développement (`console`) écrit le message complet, lien d'activation compris, dans les logs. | C'est son rôle en développement ; ne jamais l'utiliser en production (`EPICOIN_MAILER=smtp`). |
+| A19 | Le premier administrateur se crée en ligne de commande : `epicoin-api create-admin`, qui affiche son lien d'activation. | Pas de compte par défaut ni de mot de passe initial. |

@@ -14,7 +14,7 @@ dans `docs/DECISIONS.md` (à compléter à chaque nouvelle décision).
 crates/
   epicoin-core/   règles de la chaîne : types, crypto, transactions, blocs, machine d'état (lib pure, sans I/O)
   epicoin-node/   nœud : mempool, production de blocs, stockage redb, API HTTP interne, mode réplica
-  epicoin-api/    backend applicatif : auth, comptes, wallets custodiaux, boutique, admin              (phases 3-4)
+  epicoin-api/    backend applicatif : auth, comptes, wallets custodiaux, mint, admin (boutique : phase 4)
   epicoin-cli/    outils : genesis, vérification de la chaîne, administration
 web/              front React + TypeScript + Vite                                                    (phase 5)
 docs/             décisions, guides, modèle de menace
@@ -50,6 +50,22 @@ boutique, audit).
 - `verify.rs` : rejeu complet depuis le genesis (utilisé par `epicoin-cli verify`).
 - Mode validateur si `EPICOIN_VALIDATOR_KEY` est défini, mode réplica si `--upstream` l'est.
 
+### API (`epicoin-api`)
+
+- `chain.rs` : seul point d'envoi vers la chaîne. Une transaction est écrite dans `chain_txs`
+  avant d'être soumise ; `reconcile` la rejoue jusqu'à un statut final. Ne jamais soumettre une
+  transaction au nœud sans passer par `ChainService`.
+- `auth.rs` : sessions, CSRF, activation, réinitialisation. L'extracteur `CurrentUser` impose
+  session valide + jeton CSRF ; chaque handler appelle ensuite `current.require(&[Role::…])`.
+- `vault.rs` / `wallets.rs` : clés custodiales chiffrées ; `load_keypair` est le seul endroit où
+  une clé privée existe en clair.
+- `authority.rs` : aligne les autorités de mint on-chain sur le rôle `staff`.
+- `users.rs`, `mint.rs`, `me.rs`, `admin.rs` : endpoints par rôle. Erreurs en JSON
+  `{error, message}` : `error` est un code stable, `message` un texte français pour l'interface.
+- Migrations SQL dans `crates/epicoin-api/migrations/`, appliquées au démarrage.
+- Les tests d'intégration (`tests/`) utilisent un vrai Postgres (une base jetable par test via
+  `#[sqlx::test]`) et un vrai nœud lancé en mémoire.
+
 ## Invariants à ne jamais casser
 
 - **RGPD** : aucune donnée personnelle ni texte libre sur la chaîne. Uniquement adresses,
@@ -59,11 +75,14 @@ boutique, audit).
 - **Atomicité** : une transaction rejetée ne modifie pas l'état (vérifié par proptest).
 - **Masse monétaire** : `somme des soldes == total_minted - total_burned`.
 - **Secrets** : une clé privée n'est jamais loggée, jamais sérialisée en JSON, jamais renvoyée
-  par une API. `Keypair` n'implémente ni `Serialize` ni un `Debug` lisible.
+  par une API. `Keypair` n'implémente ni `Serialize` ni un `Debug` lisible. Les jetons (session,
+  invitation, réinitialisation) ne passent jamais dans une URL. Le test
+  `private_keys_never_appear_in_responses_or_logs` doit rester vert.
 
 ## Commandes
 
 ```sh
+docker compose up -d postgres              # requis par les tests de l'API (port 5433)
 cargo build --workspace
 cargo test --workspace                     # tests unitaires, d'intégration et proptests
 cargo test -p epicoin-core                 # un seul crate
@@ -82,6 +101,18 @@ cargo run -p epicoin-cli -- verify --genesis ./data/dev/genesis.json --data-dir 
 ```
 
 Le dossier `data/` est ignoré par git : il contient des clés secrètes.
+
+```sh
+# Lancer l'API en local (nœud démarré comme ci-dessus)
+export EPICOIN_DATABASE_URL=postgres://epicoin:epicoin@127.0.0.1:5433/epicoin
+export EPICOIN_PUBLIC_URL=http://localhost:8088 EPICOIN_COOKIE_SECURE=false
+export EPICOIN_MASTER_KEY=$(cargo run -q -p epicoin-api -- generate-master-key)   # à conserver !
+cargo run -p epicoin-api -- create-admin --email moi@epitech.eu --first-name Prenom --last-name Nom
+cargo run -p epicoin-api
+```
+
+`DATABASE_URL` vaut par défaut `postgres://epicoin:epicoin@127.0.0.1:5433/epicoin` pour les
+tests (voir `.cargo/config.toml`).
 
 Rust est installé via Homebrew (pas de `rustup`) : pas de `rust-toolchain.toml`, on suit le
 stable courant.
@@ -106,7 +137,7 @@ par EpiCoin sont configurables et valent par défaut 5433 (Postgres) et 8088 (we
 
 1. Core — fait
 2. Nœud, CLI, réplica — fait
-3. API : auth, wallets, mint, audit
+3. API : auth, wallets, mint, audit — fait
 4. Boutique
 5. Front React
 6. Déploiement et documentation

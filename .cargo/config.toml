@@ -1,0 +1,5 @@
+# Development defaults. Real environment variables take precedence.
+[env]
+# Postgres from `docker compose up -d postgres`; used by the API integration tests, which
+# create one throw-away database per test.
+DATABASE_URL = { value = "postgres://epicoin:epicoin@127.0.0.1:5433/epicoin", force = false }
