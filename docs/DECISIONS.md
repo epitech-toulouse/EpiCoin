@@ -104,6 +104,9 @@ Choix non imposés par la spécification, avec leur raison. À compléter au fil
 | F7 | Les données sont rechargées à chaque affichage d'écran (`staleTime: 0`) ; les files de travail se rafraîchissent périodiquement. | Soldes, stock et commandes sont modifiés par d'autres personnes ; un écran ne doit jamais montrer un état périmé. |
 | F8 | Toute réponse 401 `unauthorized` ramène à l'écran de connexion et vide les données en mémoire. | Session expirée, désactivée ou fermée dans un autre onglet. |
 | F9 | Le jeton d'un lien reçu par email est lu dans le fragment d'URL. | Voir A5. |
+| F11 | Design inspiré de l'intranet du campus : barre bleue, menu latéral en sections `< … />`, fond gris à pointillés, cartes carrées, titres et chiffres en police condensée (Anton), libellés en monospace (IBM Plex Mono), texte courant en Inter. Le logo est `{EPICOIN}`, pas celui d'Epitech. | Les utilisateurs retrouvent les codes visuels qu'ils connaissent ; aucune marque reproduite. |
+| F12 | Polices hébergées par le site (paquets `@fontsource`), icônes `lucide-react`. | La CSP n'autorise que l'origine du site ; pas de dépendance à un CDN. |
+| F13 | Couleurs des graphiques validées pour le daltonisme : vert/ambre (comptes), bleu/sarcelle (masse monétaire). Vert et rouge ne sont jamais côte à côte ; chaque valeur est aussi écrite en clair. Le texte coloré utilise des teintes plus foncées (contraste ≥ 4,5:1). | Lisible par tous, sans dépendre de la seule couleur. |
 | F10 | Les tests E2E lancent une pile complète et jetable (`e2e/stack.mjs` : nouvelle chaîne, nouvelle base, nœud, API, front compilé) ; les emails sont lus dans le journal du mailer console. | Le parcours est testé de bout en bout sur les vrais binaires, sans service SMTP. |
 
 ## Déploiement et exploitation

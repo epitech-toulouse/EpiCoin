@@ -80,6 +80,6 @@ export function homeOf(role: Role): string {
     case 'shop_manager':
       return '/gestion/commandes';
     case 'admin':
-      return '/admin/utilisateurs';
+      return '/admin';
   }
 }

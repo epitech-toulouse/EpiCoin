@@ -8,7 +8,7 @@ import { Loading } from './components/ui';
 import type { Role } from './lib/types';
 import { AuditPage } from './pages/admin/AuditPage';
 import { ExplorerAccountPage, ExplorerBlockPage, ExplorerPage } from './pages/admin/ExplorerPage';
-import { StatsPage } from './pages/admin/StatsPage';
+import { DashboardPage } from './pages/admin/DashboardPage';
 import { UsersPage } from './pages/admin/UsersPage';
 import { ActivationPage, ForgotPage, LoginPage, ResetPage } from './pages/auth/AuthPages';
 import { ManageOrdersPage } from './pages/shop/ManageOrdersPage';
@@ -68,7 +68,7 @@ export function App() {
         <Route path="/gestion/produits" element={<Protected roles={MANAGERS}><ManageProductsPage /></Protected>} />
 
         <Route path="/admin/utilisateurs" element={<Protected roles={['admin']}><UsersPage /></Protected>} />
-        <Route path="/admin/statistiques" element={<Protected roles={['admin']}><StatsPage /></Protected>} />
+        <Route path="/admin" element={<Protected roles={['admin']}><DashboardPage /></Protected>} />
         <Route path="/admin/audit" element={<Protected roles={['admin']}><AuditPage /></Protected>} />
         <Route path="/admin/explorateur" element={<Protected roles={['admin']}><ExplorerPage /></Protected>} />
         <Route path="/admin/explorateur/blocs/:id" element={<Protected roles={['admin']}><ExplorerBlockPage /></Protected>} />

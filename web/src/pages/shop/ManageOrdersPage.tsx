@@ -1,6 +1,14 @@
 // Shop manager: the order queue.
 
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  Ban,
+  List,
+  PackageCheck,
+  PackageOpen,
+  Truck,
+  type LucideIcon,
+} from 'lucide-react';
 import { useState } from 'react';
 import {
   Badge,
@@ -11,6 +19,7 @@ import {
   Loading,
   PageHeader,
   Pagination,
+  Tabs,
 } from '../../components/ui';
 import { api, query } from '../../lib/api';
 import { formatDateTime, formatEpc, ORDER_STATUS_LABELS } from '../../lib/format';
@@ -19,12 +28,12 @@ import { OrderItems, ORDER_TONES } from '../student/OrdersPage';
 
 const PAGE = 20;
 
-const FILTERS: { value: OrderStatus | ''; label: string }[] = [
-  { value: 'pending', label: 'À préparer' },
-  { value: 'ready', label: 'Prêtes à remettre' },
-  { value: 'delivered', label: 'Remises' },
-  { value: 'cancelled', label: 'Annulées' },
-  { value: '', label: 'Toutes' },
+const FILTERS: { value: OrderStatus | ''; label: string; icon: LucideIcon }[] = [
+  { value: 'pending', label: 'À préparer', icon: PackageOpen },
+  { value: 'ready', label: 'Prêtes à remettre', icon: PackageCheck },
+  { value: 'delivered', label: 'Remises', icon: Truck },
+  { value: 'cancelled', label: 'Annulées', icon: Ban },
+  { value: '', label: 'Toutes', icon: List },
 ];
 
 export function ManageOrdersPage() {
@@ -60,27 +69,15 @@ export function ManageOrdersPage() {
   return (
     <>
       <PageHeader title="Commandes" />
-      <div role="tablist" aria-label="Filtrer par état" className="mb-5 flex flex-wrap gap-2">
-        {FILTERS.map((filter) => (
-          <button
-            key={filter.value}
-            type="button"
-            role="tab"
-            aria-selected={status === filter.value}
-            onClick={() => {
-              setStatus(filter.value);
-              setOffset(0);
-            }}
-            className={`min-h-9 rounded-full px-4 text-sm font-medium ${
-              status === filter.value
-                ? 'bg-brand-600 text-white'
-                : 'bg-white text-slate-700 ring-1 ring-inset ring-slate-300 hover:bg-slate-50'
-            }`}
-          >
-            {filter.label}
-          </button>
-        ))}
-      </div>
+      <Tabs
+        label="Filtrer par état"
+        value={status}
+        options={FILTERS}
+        onChange={(value) => {
+          setStatus(value);
+          setOffset(0);
+        }}
+      />
 
       <ErrorAlert error={orders.error} />
       <ErrorAlert error={advance.error} />
@@ -111,7 +108,7 @@ export function ManageOrdersPage() {
                       </Badge>
                     </div>
                     <OrderItems order={order} />
-                    <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3">
+                    <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-3">
                       <p className="font-semibold tabular-nums">{formatEpc(order.total)}</p>
                       <div className="flex flex-wrap gap-2">
                         {order.status === 'pending' && (

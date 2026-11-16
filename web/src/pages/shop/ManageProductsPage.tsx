@@ -166,12 +166,12 @@ export function ManageProductsPage() {
               </Th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-line">
             {products.data?.map((product) => (
               <tr key={product.id}>
                 <Td>
                   <div className="flex items-center gap-3">
-                    <ProductImage product={product} className="size-10 shrink-0 rounded" />
+                    <ProductImage product={product} className="size-10 shrink-0" />
                     <div className="min-w-0">
                       <p className="font-medium">{product.name}</p>
                       <p className="max-w-md truncate text-slate-600">{product.description}</p>

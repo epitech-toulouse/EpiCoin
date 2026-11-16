@@ -1,11 +1,20 @@
 // The catalogue.
 
 import { useQuery } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
+import { ShoppingCart } from 'lucide-react';
 import { useCart } from '../../cart';
-import { Badge, Button, Empty, ErrorAlert, Loading, PageHeader } from '../../components/ui';
+import {
+  Amount,
+  Badge,
+  Button,
+  ButtonLink,
+  cx,
+  Empty,
+  ErrorAlert,
+  Loading,
+  PageHeader,
+} from '../../components/ui';
 import { api } from '../../lib/api';
-import { formatEpc } from '../../lib/format';
 import type { Product } from '../../lib/types';
 
 export function ProductImage({ product, className }: { product: Product; className: string }) {
@@ -13,14 +22,19 @@ export function ProductImage({ product, className }: { product: Product; classNa
     return (
       <div
         aria-hidden="true"
-        className={`flex items-center justify-center bg-slate-100 text-3xl font-semibold text-slate-400 ${className}`}
+        className={cx(
+          'display flex items-center justify-center bg-brand-50 text-3xl text-brand-200',
+          className,
+        )}
       >
         {product.name.charAt(0).toUpperCase()}
       </div>
     );
   }
   // Decorative: the product name is right next to it.
-  return <img src={product.image_url} alt="" loading="lazy" className={`object-cover ${className}`} />;
+  return (
+    <img src={product.image_url} alt="" loading="lazy" className={cx('object-cover', className)} />
+  );
 }
 
 export function ShopPage() {
@@ -37,12 +51,10 @@ export function ShopPage() {
         description="Échangez vos EPC contre des goodies et des avantages."
         actions={
           cart.count > 0 && (
-            <Link
-              to="/panier"
-              className="inline-flex min-h-11 items-center rounded-md bg-brand-600 px-4 text-sm font-medium text-white hover:bg-brand-700"
-            >
+            <ButtonLink to="/panier">
+              <ShoppingCart aria-hidden="true" className="size-4" />
               Voir mon panier ({cart.count})
-            </Link>
+            </ButtonLink>
           )
         }
       />
@@ -57,29 +69,24 @@ export function ShopPage() {
             const inCart = cart.lines[product.id] ?? 0;
             const soldOut = product.stock === 0;
             return (
-              <li
-                key={product.id}
-                className="flex flex-col overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-slate-200"
-              >
+              <li key={product.id} className="flex flex-col bg-white ring-1 ring-line">
                 <ProductImage product={product} className="h-40 w-full" />
-                <div className="flex flex-1 flex-col gap-2 p-4">
-                  <h2 className="font-semibold text-slate-900">{product.name}</h2>
+                <div className="flex flex-1 flex-col gap-2 border-t border-line p-5">
+                  <div className="flex items-start justify-between gap-3">
+                    <h2 className="font-semibold text-slate-900">{product.name}</h2>
+                    {soldOut ? (
+                      <Badge tone="neutral">Épuisé</Badge>
+                    ) : (
+                      product.stock <= 5 && <Badge tone="warning">Plus que {product.stock}</Badge>
+                    )}
+                  </div>
                   {product.description && (
                     <p className="text-sm text-slate-600">{product.description}</p>
                   )}
-                  <div className="mt-auto flex items-center justify-between gap-3 pt-3">
-                    <div>
-                      <p className="font-semibold tabular-nums text-slate-900">
-                        {formatEpc(product.price)}
-                      </p>
-                      {soldOut ? (
-                        <Badge tone="neutral">Épuisé</Badge>
-                      ) : (
-                        product.stock <= 5 && (
-                          <Badge tone="warning">Plus que {product.stock}</Badge>
-                        )
-                      )}
-                    </div>
+                  <div className="mt-auto flex items-end justify-between gap-3 pt-4">
+                    <p className="display text-3xl text-brand-600">
+                      <Amount units={product.price} />
+                    </p>
                     <Button
                       size="sm"
                       disabled={soldOut || inCart >= product.stock}

@@ -69,7 +69,7 @@ export function CartPage() {
               ? `Votre paiement de ${formatEpc(paid.total)} est confirmé. Vous serez prévenu quand votre commande sera prête à retirer.`
               : 'Votre paiement est en cours de confirmation. Suivez son avancement dans « Mes commandes ».'}
           </Alert>
-          <Link to="/commandes" className="text-sm font-medium text-brand-700 underline">
+          <Link to="/commandes" className="text-sm font-medium text-brand-600 underline underline-offset-2">
             Voir mes commandes
           </Link>
         </div>
@@ -86,7 +86,7 @@ export function CartPage() {
       {lines.length === 0 ? (
         <Empty>
           Votre panier est vide.{' '}
-          <Link to="/boutique" className="font-medium text-brand-700 underline">
+          <Link to="/boutique" className="font-medium text-brand-600 underline underline-offset-2">
             Découvrir la boutique
           </Link>
         </Empty>
@@ -96,7 +96,7 @@ export function CartPage() {
             {lines.map(({ product, quantity }) => (
               <li key={product.id}>
                 <Card className="flex items-center gap-4">
-                  <ProductImage product={product} className="size-16 shrink-0 rounded-md" />
+                  <ProductImage product={product} className="size-16 shrink-0" />
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-medium text-slate-900">{product.name}</p>
                     <p className="text-sm text-slate-600">{formatEpc(product.price)} l'unité</p>

@@ -69,7 +69,7 @@ export function AuditPage() {
                   <Th>Détails</Th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-line">
                 {entries.data.items.map((entry) => (
                   <tr key={entry.id}>
                     <Td className="whitespace-nowrap text-slate-600">{formatDateTime(entry.at)}</Td>

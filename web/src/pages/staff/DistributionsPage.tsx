@@ -55,7 +55,7 @@ export function DistributionsPage() {
                   <Th>État</Th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-line">
                 {lines.data.items.map((line) => (
                   <tr key={line.tx_hash}>
                     <Td className="whitespace-nowrap text-slate-600">

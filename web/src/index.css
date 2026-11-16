@@ -1,12 +1,36 @@
 @import 'tailwindcss';
 
+/* Self-hosted fonts: the Content-Security-Policy only allows the site's own origin. */
+@import '@fontsource-variable/inter';
+@import '@fontsource/anton/400.css';
+@import '@fontsource/ibm-plex-mono/400.css';
+@import '@fontsource/ibm-plex-mono/500.css';
+@import '@fontsource/ibm-plex-mono/600.css';
+
 @theme {
-  --color-brand-50: #eff6ff;
-  --color-brand-100: #dbeafe;
-  --color-brand-600: #1d4ed8;
-  --color-brand-700: #1e40af;
-  --color-brand-900: #1e3a8a;
-  --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  /* Campus blue. */
+  --color-brand-50: #eef3ff;
+  --color-brand-100: #dbe5fe;
+  --color-brand-200: #b9ccfd;
+  --color-brand-600: #1257f5;
+  --color-brand-700: #0c46d4;
+  --color-brand-900: #0a2d86;
+
+  /* State colours: always shown with a label or an icon, never alone. Green and red are
+     never placed side by side (indistinguishable with deuteranopia). */
+  --color-ok: #3fa45f;
+  --color-warn: #e8a317;
+  --color-danger: #e5534b;
+  /* Second categorical hue, validated against the blue for colour-blind readers. */
+  --color-teal: #0fa3a3;
+  --color-accent: #c84fd8;
+
+  --color-canvas: #f3f3f1;
+  --color-line: #e2e2de;
+
+  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-display: 'Anton', 'Impact', 'Arial Narrow', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', monospace;
 }
 
 html {
@@ -14,7 +38,10 @@ html {
 }
 
 body {
-  @apply bg-slate-50 text-slate-900 antialiased;
+  @apply bg-canvas font-sans text-slate-900 antialiased;
+  /* The dotted grid of the campus intranet. */
+  background-image: radial-gradient(circle, #d6d6d1 1px, transparent 1.2px);
+  background-size: 18px 18px;
 }
 
 /* One visible focus style for everything that can be focused with the keyboard. */
@@ -24,4 +51,21 @@ body {
 
 dialog::backdrop {
   background: rgb(15 23 42 / 0.5);
+}
+
+/* Small uppercase monospace labels: section names, card titles, column headers. */
+@utility label-mono {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+/* The condensed display face: page titles and headline numbers. */
+@utility display {
+  font-family: var(--font-display);
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  line-height: 1;
 }

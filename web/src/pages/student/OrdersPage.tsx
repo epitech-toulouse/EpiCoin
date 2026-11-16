@@ -71,7 +71,7 @@ export function OrdersPage() {
                   <Badge tone={ORDER_TONES[order.status]}>{ORDER_STATUS_LABELS[order.status]}</Badge>
                 </div>
                 <OrderItems order={order} />
-                <p className="mt-3 flex justify-between border-t border-slate-100 pt-3 font-semibold">
+                <p className="mt-3 flex justify-between border-t border-line pt-3 font-semibold">
                   <span>Total</span>
                   <span className="tabular-nums">{formatEpc(order.total)}</span>
                 </p>

@@ -61,6 +61,10 @@ let manager: Page;
 test('the first administrator activates their account', async ({ browser }) => {
   admin = await newUserPage(browser);
   await activate(admin, stack.adminActivationUrl);
+  // Administrators land on their dashboard.
+  await expect(admin.getByRole('heading', { name: 'Tableau de bord' })).toBeVisible();
+  await expect(admin.getByText('Actions prioritaires')).toBeVisible();
+  await admin.getByRole('link', { name: 'Utilisateurs' }).click();
   await expect(admin.getByRole('heading', { name: 'Utilisateurs' })).toBeVisible();
   await expect(admin.getByText('admin@epitech.eu')).toBeVisible();
 
@@ -253,7 +257,7 @@ test('a cancelled order is refunded', async ({ browser }) => {
 });
 
 test('the administrator follows everything: statistics, chain and audit', async () => {
-  await admin.getByRole('link', { name: 'Statistiques' }).click();
+  await admin.getByRole('link', { name: 'Tableau de bord' }).click();
   await expect(admin.getByText(/^70\s*EPC$/).first()).toBeVisible(); // 50 + 20 minted
   await expect(admin.getByRole('cell', { name: 'Alan Turing' })).toBeVisible();
   await expect(admin.getByRole('cell', { name: 'Entraide' })).toBeVisible();
@@ -318,10 +322,29 @@ test('the interface is usable on a phone', async ({ browser }) => {
   await phone.getByRole('button', { name: 'Menu' }).click();
   await phone.getByRole('link', { name: 'Boutique', exact: true }).click();
   await expect(phone.getByRole('heading', { name: 'Mug EpiCoin' })).toBeVisible();
-  const overflow = await phone.evaluate(
-    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
-  );
-  expect(overflow).toBeLessThanOrEqual(0);
+  const overflow = () =>
+    phone.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    );
+  expect(await overflow()).toBeLessThanOrEqual(0);
+
+  // Wide tables scroll inside their frame: no page, whoever the user, scrolls sideways.
+  const pages: [string, string[]][] = [
+    ['ada.lovelace@epitech.eu', ['/', '/panier', '/commandes']],
+    ['admin@epitech.eu', ['/admin', '/admin/utilisateurs', '/admin/explorateur', '/admin/audit', '/gestion/produits', '/gestion/commandes']],
+    ['alan.turing@epitech.eu', ['/distribuer', '/distributions']],
+  ];
+  for (const [email, routes] of pages) {
+    await context.clearCookies();
+    await login(phone, email);
+    await expect(phone.getByRole('button', { name: 'Menu' })).toBeVisible();
+    for (const route of routes) {
+      await phone.goto(route);
+      await expect(phone.getByRole('heading', { level: 1 })).toBeVisible();
+      await phone.waitForLoadState('networkidle');
+      expect(await overflow(), `${route} scrolls sideways`).toBeLessThanOrEqual(0);
+    }
+  }
   await context.close();
 });
 

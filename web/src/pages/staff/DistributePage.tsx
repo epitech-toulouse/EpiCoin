@@ -1,15 +1,18 @@
 // Staff: give EPC to one or several students.
 
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Coins, Gauge, Users } from 'lucide-react';
 import { useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import {
   Alert,
   Badge,
   Button,
   Card,
+  CardTitle,
   Empty,
   ErrorAlert,
   Loading,
+  Meter,
   PageHeader,
   SelectField,
   Stat,
@@ -177,24 +180,40 @@ export function DistributePage() {
           </Alert>
         </div>
       ) : (
-        <div className="mb-6 grid gap-4 sm:grid-cols-3">
-          <Stat label="Quota restant" value={formatEpc(quota.data.remaining)} />
-          <Stat label="Déjà distribué sur la période" value={formatEpc(quota.data.minted)} />
-          <Stat
-            label="Quota de la période"
-            value={formatEpc(quota.data.quota)}
-            hint={
-              quota.data.period_ends_at
-                ? `Remis à zéro le ${formatDate(quota.data.period_ends_at)}`
-                : undefined
-            }
+        <Card className="mb-8">
+          <CardTitle icon={Gauge} to="/distributions">
+            Quota de la période
+          </CardTitle>
+          <div className="mb-5 grid gap-6 sm:grid-cols-3">
+            <Stat
+              label="Quota restant"
+              value={formatEpc(quota.data.remaining)}
+              tone={quota.data.remaining > 0 ? 'ok' : 'danger'}
+              size="lg"
+            />
+            <Stat label="Déjà distribué sur la période" value={formatEpc(quota.data.minted)} />
+            <Stat
+              label="Quota de la période"
+              value={formatEpc(quota.data.quota)}
+              tone="neutral"
+              hint={
+                quota.data.period_ends_at
+                  ? `Remis à zéro le ${formatDate(quota.data.period_ends_at)}`
+                  : undefined
+              }
+            />
+          </div>
+          <Meter
+            value={quota.data.minted}
+            max={quota.data.quota}
+            label="Part du quota déjà distribuée"
           />
-        </div>
+        </Card>
       )}
 
       <form onSubmit={submit} className="grid gap-6 lg:grid-cols-[1fr_22rem]">
         <Card>
-          <h2 className="mb-4 text-lg font-semibold">1. Choisir les étudiants</h2>
+          <CardTitle icon={Users}>1 · Choisir les étudiants</CardTitle>
           <div className="mb-4 grid gap-3 sm:grid-cols-[1fr_10rem]">
             <TextField
               label="Rechercher"
@@ -268,7 +287,7 @@ export function DistributePage() {
           ) : students.data && students.data.items.length === 0 ? (
             <Empty>Aucun étudiant ne correspond à cette recherche.</Empty>
           ) : (
-            <ul className="max-h-96 divide-y divide-slate-100 overflow-y-auto rounded-md ring-1 ring-slate-200">
+            <ul className="max-h-96 divide-y divide-line overflow-y-auto ring-1 ring-line">
               {students.data?.items.map((student) => (
                 <li key={student.id}>
                   <label className="flex cursor-pointer items-center gap-3 px-3 py-2 hover:bg-slate-50">
@@ -300,7 +319,9 @@ export function DistributePage() {
         </Card>
 
         <Card className="h-fit space-y-4">
-          <h2 className="text-lg font-semibold">2. Montant et motif</h2>
+          <CardTitle icon={Coins} tone="ok">
+            2 · Montant et motif
+          </CardTitle>
           <TextField
             label="Montant par étudiant (EPC)"
             inputMode="decimal"
@@ -339,7 +360,7 @@ export function DistributePage() {
             }}
           />
 
-          <dl className="space-y-1 border-t border-slate-100 pt-3 text-sm">
+          <dl className="space-y-1 border-t border-line pt-3 text-sm">
             <div className="flex justify-between">
               <dt className="text-slate-600">Étudiants sélectionnés</dt>
               <dd className="font-medium tabular-nums" data-testid="selected-count">

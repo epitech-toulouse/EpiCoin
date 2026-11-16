@@ -80,6 +80,10 @@ boutique, audit).
   `src/lib/format.ts` : montants (entiers d'unités, jamais de flottants), dates, libellés.
 - `src/auth.tsx` (session), `src/cart.tsx` (panier + clé d'idempotence), `src/App.tsx`
   (routes par rôle), `src/components/ui.tsx` (composants accessibles), `src/pages/<rôle>/`.
+- Design « intranet du campus » : couleurs et polices dans `src/index.css` (`@theme`), composants
+  dans `src/components/ui.tsx` (`PageHeader`, `SectionTitle`, `Card`/`CardTitle`, `Stat`,
+  `ActionCard`, `Tabs`, `Meter`, `Donut`, `SegmentedBar`). Réutiliser ces composants plutôt que
+  des classes ad hoc. Le `_` final des titres est décoratif (`aria-hidden`).
 - Toute l'interface est en français ; les textes d'erreur viennent de l'API (`message`).
 - `e2e/journey.spec.ts` : le parcours complet sur une pile réelle (`e2e/stack.mjs`).
 

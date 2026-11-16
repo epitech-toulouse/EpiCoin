@@ -261,7 +261,7 @@ function EditForm({ user, onDone }: { user: AdminUser; onDone: () => void }) {
         </label>
       )}
 
-      <div className="flex flex-wrap justify-between gap-2 border-t border-slate-100 pt-4">
+      <div className="flex flex-wrap justify-between gap-2 border-t border-line pt-4">
         <div className="flex flex-wrap gap-2">
           {!user.activated && (
             <Button variant="secondary" size="sm" busy={invite.isPending} onClick={() => invite.mutate()}>
@@ -379,7 +379,7 @@ export function UsersPage() {
                   </Th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-line">
                 {users.data.items.map((user) => (
                   <tr key={user.id}>
                     <Td>

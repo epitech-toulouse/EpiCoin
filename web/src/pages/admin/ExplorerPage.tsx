@@ -2,14 +2,17 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router-dom';
+import { Blocks } from 'lucide-react';
 import {
   Badge,
   Card,
+  CardTitle,
   Empty,
   ErrorAlert,
   Loading,
   Mono,
   PageHeader,
+  SectionTitle,
   Stat,
   Table,
   Td,
@@ -19,7 +22,7 @@ import { api } from '../../lib/api';
 import { formatDateTime, formatEpc, reasonLabel, shortHash } from '../../lib/format';
 import type { Block, BlockSummary, ChainAccount, ChainStatus, ChainTx } from '../../lib/types';
 
-const linkClass = 'font-medium text-brand-700 underline';
+const linkClass = 'font-medium text-brand-600 underline underline-offset-2';
 
 function AddressLink({ address }: { address: string }) {
   return (
@@ -78,7 +81,7 @@ function TxTable({ txs, caption }: { txs: ChainTx[]; caption: string }) {
           <Th>Identifiant</Th>
         </tr>
       </thead>
-      <tbody className="divide-y divide-slate-100">
+      <tbody className="divide-y divide-line">
         {txs.map((tx) => (
           <tr key={tx.hash}>
             <Td>
@@ -142,15 +145,28 @@ export function ExplorerPage() {
         title="Blockchain"
         description="Le registre public d'EpiCoin : il ne contient que des adresses, des montants et des codes, jamais de nom."
       />
-      <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Stat label="Hauteur" value={status.data.height} hint={`Chaîne ${status.data.chain_id}`} />
-        <Stat label="EPC émis" value={formatEpc(status.data.total_minted)} />
-        <Stat label="EPC en circulation" value={formatEpc(status.data.circulating_supply)} />
-        <Stat label="Transactions en attente" value={status.data.mempool_size} />
-      </div>
+      <Card className="mb-10">
+        <CardTitle icon={Blocks} tone="teal">
+          État de la chaîne
+        </CardTitle>
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+          <Stat label="Hauteur" value={status.data.height} hint={`Chaîne ${status.data.chain_id}`} />
+          <Stat label="EPC émis" value={formatEpc(status.data.total_minted)} />
+          <Stat
+            label="EPC en circulation"
+            value={formatEpc(status.data.circulating_supply)}
+            tone="teal"
+          />
+          <Stat
+            label="Transactions en attente"
+            value={status.data.mempool_size}
+            tone={status.data.mempool_size > 0 ? 'warn' : 'neutral'}
+          />
+        </div>
+      </Card>
 
-      <section className="mb-8">
-        <h2 className="mb-3 text-lg font-semibold">Derniers blocs</h2>
+      <section className="mb-10">
+        <SectionTitle>Derniers blocs</SectionTitle>
         <ErrorAlert error={blocks.error} />
         {blocks.isPending ? (
           <Loading />
@@ -166,7 +182,7 @@ export function ExplorerPage() {
                 <Th>Hash</Th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-line">
               {blocks.data?.map((block) => (
                 <tr key={block.hash}>
                   <Td>
@@ -190,14 +206,14 @@ export function ExplorerPage() {
         )}
       </section>
 
-      <section className="mb-8">
-        <h2 className="mb-3 text-lg font-semibold">Dernières transactions</h2>
+      <section className="mb-10">
+        <SectionTitle>Dernières transactions</SectionTitle>
         <ErrorAlert error={txs.error} />
         {txs.isPending ? <Loading /> : <TxTable txs={txs.data ?? []} caption="Dernières transactions" />}
       </section>
 
       <section>
-        <h2 className="mb-3 text-lg font-semibold">Soldes par adresse</h2>
+        <SectionTitle tone="teal">Soldes par adresse</SectionTitle>
         <ErrorAlert error={accounts.error} />
         {accounts.isPending ? (
           <Loading />
@@ -212,7 +228,7 @@ export function ExplorerPage() {
                 <Th className="text-right">Solde</Th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-line">
               {accounts.data?.items.map((account) => (
                 <tr key={account.address}>
                   <Td>
@@ -251,8 +267,8 @@ function Back() {
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="grid gap-1 py-2 sm:grid-cols-[12rem_1fr]">
-      <dt className="text-sm text-slate-600">{label}</dt>
+    <div className="grid gap-1 py-2.5 sm:grid-cols-[14rem_1fr]">
+      <dt className="label-mono pt-0.5 text-slate-500">{label}</dt>
       <dd className="text-sm">{children}</dd>
     </div>
   );
@@ -277,7 +293,7 @@ export function ExplorerBlockPage() {
         <>
           <PageHeader title={`Bloc n° ${block.data.height}`} />
           <Card className="mb-6">
-            <dl className="divide-y divide-slate-100">
+            <dl className="divide-y divide-line">
               <Field label="Date">{formatDateTime(block.data.timestamp)}</Field>
               <Field label="Hash">
                 <Mono>{block.data.hash}</Mono>
@@ -307,9 +323,7 @@ export function ExplorerBlockPage() {
               </Field>
             </dl>
           </Card>
-          <h2 className="mb-3 text-lg font-semibold">
-            {block.data.txs.length} transaction(s)
-          </h2>
+          <SectionTitle>{`${block.data.txs.length} transaction(s)`}</SectionTitle>
           <TxTable txs={block.data.txs} caption="Transactions du bloc" />
         </>
       )}
@@ -336,7 +350,7 @@ export function ExplorerAccountPage() {
         <>
           <PageHeader title={account.data.label ?? 'Compte'} />
           <Card className="mb-6">
-            <dl className="divide-y divide-slate-100">
+            <dl className="divide-y divide-line">
               <Field label="Adresse">
                 <Mono>{account.data.address}</Mono>
               </Field>
@@ -351,7 +365,7 @@ export function ExplorerAccountPage() {
               )}
             </dl>
           </Card>
-          <h2 className="mb-3 text-lg font-semibold">Transactions</h2>
+          <SectionTitle>Transactions</SectionTitle>
           <TxTable txs={account.data.transactions ?? []} caption="Transactions du compte" />
         </>
       )}

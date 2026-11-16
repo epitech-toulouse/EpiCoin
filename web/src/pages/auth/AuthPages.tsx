@@ -66,7 +66,7 @@ export function LoginPage() {
           Se connecter
         </Button>
         <p className="text-center text-sm">
-          <Link to="/mot-de-passe-oublie" className="text-brand-700 underline">
+          <Link to="/mot-de-passe-oublie" className="text-brand-600 underline underline-offset-2">
             Mot de passe oublié ?
           </Link>
         </p>
@@ -158,7 +158,7 @@ export function ActivationPage() {
             Ce lien d'activation est invalide ou a expiré. Demandez à un administrateur de vous
             renvoyer une invitation.
           </Alert>
-          <Link to="/connexion" className="text-sm text-brand-700 underline">
+          <Link to="/connexion" className="text-sm text-brand-600 underline underline-offset-2">
             Retour à la connexion
           </Link>
         </div>
@@ -223,7 +223,7 @@ export function ForgotPage() {
             Si un compte existe pour cette adresse, un email vient de lui être envoyé avec un lien
             pour choisir un nouveau mot de passe.
           </Alert>
-          <Link to="/connexion" className="text-sm text-brand-700 underline">
+          <Link to="/connexion" className="text-sm text-brand-600 underline underline-offset-2">
             Retour à la connexion
           </Link>
         </div>
@@ -242,7 +242,7 @@ export function ForgotPage() {
             Recevoir un lien
           </Button>
           <p className="text-center text-sm">
-            <Link to="/connexion" className="text-brand-700 underline">
+            <Link to="/connexion" className="text-brand-600 underline underline-offset-2">
               Retour à la connexion
             </Link>
           </p>
@@ -271,7 +271,7 @@ export function ResetPage() {
       <PublicFrame title="Mot de passe modifié">
         <div className="space-y-4">
           <Alert tone="success">Votre mot de passe a été modifié.</Alert>
-          <Link to="/connexion" className="text-sm text-brand-700 underline">
+          <Link to="/connexion" className="text-sm text-brand-600 underline underline-offset-2">
             Se connecter
           </Link>
         </div>
