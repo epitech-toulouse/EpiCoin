@@ -1,0 +1,31 @@
+#!/bin/sh
+# First boot: creates the chain — its genesis and its keys — exactly once.
+#
+# Each service only receives the secrets it needs:
+#   /secrets/node/keys.env  the validator key            (node)
+#   /secrets/api/keys.env   the admin, treasury and master keys  (API)
+set -eu
+
+if [ -f /chain/genesis.json ]; then
+  echo "EpiCoin chain already initialized."
+  exit 0
+fi
+
+umask 077
+work="$(mktemp -d)"
+trap 'rm -rf "$work"' EXIT
+
+epicoin-cli genesis --chain-id "${EPICOIN_CHAIN_ID:-epicoin}" --out-dir "$work"
+grep '^EPICOIN_VALIDATOR_KEY=' "$work/keys.env" >/secrets/node/keys.env
+{
+  grep -E '^EPICOIN_(ADMIN|TREASURY)_KEY=' "$work/keys.env"
+  echo "EPICOIN_MASTER_KEY=$(epicoin-api generate-master-key)"
+} >/secrets/api/keys.env
+
+# Written last: its presence means the initialization is complete.
+umask 022
+cp "$work/genesis.json" /chain/genesis.json
+
+echo
+echo "IMPORTANT: back up the keys now, and keep that copy offline:"
+echo "    scripts/backup.sh --with-secrets"

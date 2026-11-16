@@ -1,0 +1,8 @@
+target
+web
+data
+backups
+.git
+.github
+docs
+**/node_modules

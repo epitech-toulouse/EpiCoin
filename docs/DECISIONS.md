@@ -105,3 +105,20 @@ Choix non imposés par la spécification, avec leur raison. À compléter au fil
 | F8 | Toute réponse 401 `unauthorized` ramène à l'écran de connexion et vide les données en mémoire. | Session expirée, désactivée ou fermée dans un autre onglet. |
 | F9 | Le jeton d'un lien reçu par email est lu dans le fragment d'URL. | Voir A5. |
 | F10 | Les tests E2E lancent une pile complète et jetable (`e2e/stack.mjs` : nouvelle chaîne, nouvelle base, nœud, API, front compilé) ; les emails sont lus dans le journal du mailer console. | Le parcours est testé de bout en bout sur les vrais binaires, sans service SMTP. |
+
+## Déploiement et exploitation
+
+| # | Décision | Raison |
+|---|---|---|
+| D1 | Une image Docker pour les trois binaires Rust, une pour le front (nginx). Le front relaie `/api` vers l'API ; seul le conteneur web publie un port (sur `127.0.0.1` par défaut). | Une seule origine pour le navigateur ; Postgres, l'API et le nœud restent sur le réseau interne. |
+| D2 | Sans `.env`, `docker compose up` lance une démo complète (genèse, clés, données de démo, Mailpit). Le modèle `.env.example` décrit une installation réelle et désactive les données de démo. | Répond au « machine vierge → plateforme fonctionnelle » sans risquer qu'une installation réelle hérite de comptes au mot de passe public. |
+| D3 | Le premier démarrage génère la genèse et toutes les clés (service `init`, une seule fois). Les clés vont dans deux volumes séparés : le nœud ne voit que la clé du validateur, l'API que les siennes. Une variable d'environnement définie l'emporte sur le volume. | Démarrage sans manipulation, moindre privilège, et possibilité de fournir des clés générées hors ligne. |
+| D4 | Les données de démo sont créées par `epicoin-api seed-demo` (service `seed`), avant le démarrage de l'API, et seulement sur une base vide. | Un seul processus signe pendant le seed : pas de conflit de nonce avec l'API. |
+| D5 | Sauvegarde : le nœud est arrêté le temps du `pg_dump` et de la copie de la chaîne. | Base et chaîne cohérentes : toute transaction incluse a sa ligne dans la sauvegarde (elle est enregistrée avant envoi) ; les lignes restées « en cours » sont rejouées après restauration. Quelques secondes de confirmations différées, pas de coupure du site. |
+| D6 | Les clés sont sauvegardées à part (`--with-secrets`), à garder hors ligne ; les sauvegardes de données peuvent partir hors site. | Une sauvegarde de données volée ne permet pas de dépenser les EPC. |
+| D7 | La restauration revérifie toute la chaîne avant de redémarrer. | On ne remet jamais en service une chaîne altérée. |
+| D8 | Rotation de la clé maître par script (sauvegarde, rechiffrement tout-ou-rien, installation de la nouvelle clé, nouvelle sauvegarde). | Procédure rare, donc à automatiser plutôt qu'à se rappeler. |
+| D9 | Sauvegarde, restauration et rotation sont testées de bout en bout par `scripts/test-operations.py` (plateforme jetable, destruction des volumes entre sauvegarde et restauration). | « Procédure de restauration testée » au sens strict. |
+| D10 | Limites par adresse cliente relevées à 200 connexions et 30 demandes de réinitialisation par fenêtre ; nginx retrouve l'adresse réelle derrière un proxy de confiance (`EPICOIN_TRUSTED_PROXIES`). | Tout un campus peut sortir par la même adresse (NAT) ; la vraie protection est la limite par compte. |
+| D11 | Mailpit est inclus dans le compose comme boîte mail de démonstration (écoute locale uniquement). | La démo montre les vrais emails, envoyés par le vrai mailer SMTP. |
+| D12 | Journaux JSON par défaut dans le compose ; contrôles de santé sur chaque service ; `/api/health` vérifie base et nœud. | Exploitation standard, prête pour un collecteur. |

@@ -17,7 +17,11 @@ crates/
   epicoin-api/    backend applicatif : auth, comptes, wallets custodiaux, mint, boutique, admin
   epicoin-cli/    outils : genesis, vérification de la chaîne, administration
 web/              front React + TypeScript + Vite
-docs/             décisions, guides, modèle de menace
+docs/             décisions, guides (admin, encadrant), modèle de menace
+scripts/          sauvegarde, restauration, rotation de la clé maître, test de ces procédures
+docker/           scripts des conteneurs (chargement des secrets, premier démarrage)
+Dockerfile        image des binaires Rust ; web/Dockerfile : front + nginx
+docker-compose.yml  plateforme complète (démo sans .env ; voir .env.example)
 ```
 
 Flux : le front parle uniquement à `epicoin-api`. L'API détient les wallets (clés chiffrées),
@@ -152,10 +156,27 @@ stable courant.
 - En cas de choix non couvert par la spec : l'option la plus simple et standard, notée dans
   `docs/DECISIONS.md`.
 
+## Déploiement
+
+```sh
+docker compose up                       # démo complète : http://localhost:8088, mails sur :8025
+docker compose down --volumes           # tout effacer
+scripts/backup.sh [--with-secrets]      # sauvegarde (le nœud est arrêté quelques secondes)
+scripts/restore.sh backups/<date>       # restauration (revérifie la chaîne)
+scripts/rotate-master-key.sh            # rotation de la clé maître
+python3 scripts/test-operations.py      # teste les trois procédures sur une plateforme jetable
+```
+
+Le premier démarrage génère la genèse et les clés (`docker/epicoin-init`) ; chaque service
+charge ses secrets avec `docker/epicoin-env`. Tester un changement de déploiement sur un projet
+séparé pour ne pas toucher au Postgres de dev :
+`COMPOSE_PROJECT_NAME=epicoin-essai EPICOIN_POSTGRES_PORT=5434 EPICOIN_WEB_PORT=8089 EPICOIN_MAILPIT_PORT=8026 docker compose up -d`.
+
 ## Environnement local
 
-Les ports 5432 et 8080 sont souvent déjà pris sur le poste de développement : les ports exposés
-par EpiCoin sont configurables et valent par défaut 5433 (Postgres) et 8088 (web).
+Les ports 5432, 7000, 8000 et 8080 sont souvent déjà pris sur le poste de développement : les
+ports exposés par EpiCoin sont configurables et valent par défaut 5433 (Postgres), 7400 (nœud),
+8090 (API), 8088 (web) et 8025 (Mailpit).
 
 ## Phases
 
@@ -164,4 +185,4 @@ par EpiCoin sont configurables et valent par défaut 5433 (Postgres) et 8088 (we
 3. API : auth, wallets, mint, audit — fait
 4. Boutique — fait
 5. Front React — fait
-6. Déploiement et documentation
+6. Déploiement et documentation — fait

@@ -1,10 +1,40 @@
-# EpiCoin services.
+# EpiCoin, the whole platform.
 #
-# For now only Postgres, used for development and tests:
-#   docker compose up -d postgres
-# The node, API and web services are added in phase 6.
+#   docker compose up            first start: creates the chain, its keys and demo data
+#   http://localhost:8088        the site       (demo accounts: see README.md)
+#   http://localhost:8025        demo mailbox   (every email the platform sends)
+#
+# Every setting comes from the environment: copy .env.example to .env to change them. For a
+# real deployment, read docs/guide-admin.md first (HTTPS, SMTP, no demo data, backups).
 
 name: epicoin
+
+x-epicoin: &epicoin
+  image: epicoin:${EPICOIN_VERSION:-local}
+  build: .
+  restart: unless-stopped
+
+x-api-env: &api-env
+  EPICOIN_DATABASE_URL: postgres://${EPICOIN_POSTGRES_USER:-epicoin}:${EPICOIN_POSTGRES_PASSWORD:-epicoin}@postgres:5432/${EPICOIN_POSTGRES_DB:-epicoin}
+  EPICOIN_NODE_URL: http://node:7400
+  EPICOIN_API_LISTEN: 0.0.0.0:8090
+  EPICOIN_PUBLIC_URL: ${EPICOIN_PUBLIC_URL:-http://localhost:8088}
+  EPICOIN_COOKIE_SECURE: ${EPICOIN_COOKIE_SECURE:-false}
+  EPICOIN_TRUST_PROXY: "true"
+  EPICOIN_ALLOWED_EMAIL_DOMAIN: ${EPICOIN_ALLOWED_EMAIL_DOMAIN:-epitech.eu}
+  EPICOIN_DEFAULT_MINT_QUOTA_EPC: ${EPICOIN_DEFAULT_MINT_QUOTA_EPC:-500}
+  EPICOIN_MAILER: ${EPICOIN_MAILER:-smtp}
+  EPICOIN_SMTP_URL: ${EPICOIN_SMTP_URL:-smtp://mailpit:1025}
+  EPICOIN_MAIL_FROM: ${EPICOIN_MAIL_FROM:-EpiCoin <noreply@epitech.eu>}
+  EPICOIN_UPLOAD_DIR: /uploads
+  EPICOIN_LOG_FORMAT: ${EPICOIN_LOG_FORMAT:-json}
+  RUST_LOG: ${RUST_LOG:-info}
+  # Secrets: read from the api-secrets volume unless set here.
+  EPICOIN_SECRETS_FILE: /secrets/api/keys.env
+  EPICOIN_MASTER_KEY: ${EPICOIN_MASTER_KEY:-}
+  EPICOIN_MASTER_KEY_PREVIOUS: ${EPICOIN_MASTER_KEY_PREVIOUS:-}
+  EPICOIN_ADMIN_KEY: ${EPICOIN_ADMIN_KEY:-}
+  EPICOIN_TREASURY_KEY: ${EPICOIN_TREASURY_KEY:-}
 
 services:
   postgres:
@@ -15,15 +45,159 @@ services:
       POSTGRES_PASSWORD: ${EPICOIN_POSTGRES_PASSWORD:-epicoin}
       POSTGRES_DB: ${EPICOIN_POSTGRES_DB:-epicoin}
     ports:
-      # 5433 on the host by default: 5432 is often taken by another project.
+      # Reachable from this machine only (development, tests, maintenance).
       - "127.0.0.1:${EPICOIN_POSTGRES_PORT:-5433}:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${EPICOIN_POSTGRES_USER:-epicoin} -d ${EPICOIN_POSTGRES_DB:-epicoin}"]
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
       interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # Catches every email in the demo; replace with a real SMTP server in production.
+  mailpit:
+    image: axllent/mailpit:v1.31
+    restart: unless-stopped
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: "true"
+      MP_SMTP_AUTH_ALLOW_INSECURE: "true"
+    ports:
+      - "127.0.0.1:${EPICOIN_MAILPIT_PORT:-8025}:8025"
+
+  # One-shot: creates the chain (genesis and keys) on first start, then does nothing.
+  init:
+    <<: *epicoin
+    restart: "no"
+    entrypoint: ["epicoin-init"]
+    environment:
+      EPICOIN_CHAIN_ID: ${EPICOIN_CHAIN_ID:-epicoin}
+    volumes:
+      - chain-config:/chain
+      - node-secrets:/secrets/node
+      - api-secrets:/secrets/api
+
+  node:
+    <<: *epicoin
+    command:
+      - epicoin-node
+      - --genesis=/chain/genesis.json
+      - --data-dir=/data
+      - --listen=0.0.0.0:7400
+    environment:
+      EPICOIN_SECRETS_FILE: /secrets/node/keys.env
+      EPICOIN_VALIDATOR_KEY: ${EPICOIN_VALIDATOR_KEY:-}
+      EPICOIN_BLOCK_INTERVAL_MS: ${EPICOIN_BLOCK_INTERVAL_MS:-3000}
+      EPICOIN_LOG_FORMAT: ${EPICOIN_LOG_FORMAT:-json}
+      RUST_LOG: ${RUST_LOG:-info}
+    volumes:
+      - chain-data:/data
+      - chain-config:/chain:ro
+      - node-secrets:/secrets/node:ro
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:7400/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # One-shot: fills an empty platform with demo data (EPICOIN_DEMO_SEED=true), then exits.
+  seed:
+    <<: *epicoin
+    restart: "no"
+    command: ["epicoin-api", "seed-demo"]
+    environment:
+      <<: *api-env
+      EPICOIN_DEMO_SEED: ${EPICOIN_DEMO_SEED:-true}
+    volumes:
+      - api-secrets:/secrets/api:ro
+      - uploads:/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      node:
+        condition: service_healthy
+
+  api:
+    <<: *epicoin
+    command: ["epicoin-api"]
+    environment: *api-env
+    volumes:
+      - api-secrets:/secrets/api:ro
+      - uploads:/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      node:
+        condition: service_healthy
+      seed:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8090/api/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  web:
+    image: epicoin-web:${EPICOIN_VERSION:-local}
+    build: ./web
+    restart: unless-stopped
+    environment:
+      # Address(es) of a reverse proxy in front of this one, if any (CIDR).
+      EPICOIN_TRUSTED_PROXIES: ${EPICOIN_TRUSTED_PROXIES:-127.0.0.1/32}
+    ports:
+      - "${EPICOIN_WEB_BIND:-127.0.0.1}:${EPICOIN_WEB_PORT:-8088}:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/"]
+      interval: 10s
       timeout: 3s
       retries: 10
 
+  # Optional read-only replica that re-verifies every block:
+  #   docker compose --profile replica up -d replica
+  replica:
+    <<: *epicoin
+    profiles: [replica]
+    command:
+      - epicoin-node
+      - --genesis=/chain/genesis.json
+      - --data-dir=/data
+      - --listen=0.0.0.0:7400
+      - --upstream=http://node:7400
+    environment:
+      EPICOIN_LOG_FORMAT: ${EPICOIN_LOG_FORMAT:-json}
+    volumes:
+      - replica-data:/data
+      - chain-config:/chain:ro
+    depends_on:
+      node:
+        condition: service_healthy
+
+  # Maintenance shell with every volume mounted; used by scripts/backup.sh and restore.sh.
+  tools:
+    <<: *epicoin
+    profiles: [tools]
+    restart: "no"
+    user: root
+    entrypoint: []
+    command: ["sh"]
+    volumes:
+      - chain-data:/data
+      - chain-config:/chain
+      - uploads:/uploads
+      - node-secrets:/secrets/node
+      - api-secrets:/secrets/api
+
 volumes:
   postgres-data:
+  chain-data:
+  chain-config:
+  uploads:
+  node-secrets:
+  api-secrets:
+  replica-data:

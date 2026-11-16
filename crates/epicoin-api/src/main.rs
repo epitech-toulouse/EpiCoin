@@ -54,6 +54,9 @@ enum Command {
     RotateMasterKey,
     /// Print a new random master key.
     GenerateMasterKey,
+    /// Fill an empty platform with demo data (fictitious users, products, distributions).
+    /// Does nothing unless EPICOIN_DEMO_SEED=true.
+    SeedDemo,
 }
 
 #[tokio::main]
@@ -88,6 +91,7 @@ async fn main() -> anyhow::Result<()> {
             last_name,
         } => create_admin(config, db, email, first_name, last_name).await,
         Command::RotateMasterKey => rotate_master_key(config, db).await,
+        Command::SeedDemo => seed_demo(config, db).await,
         Command::GenerateMasterKey => unreachable!("handled before loading the configuration"),
     }
 }
@@ -184,6 +188,44 @@ async fn create_admin(
     println!("Administrator {} created.", user.email);
     println!("Activation link (single use):");
     println!("  {}/activation#token={token}", state.settings.public_url);
+    Ok(())
+}
+
+/// Password of every demo account. Published in the README: demo only.
+const DEMO_PASSWORD: &str = "epicoin-demo";
+
+async fn seed_demo(config: Config, db: PgPool) -> anyhow::Result<()> {
+    if std::env::var("EPICOIN_DEMO_SEED").as_deref() != Ok("true") {
+        tracing::info!("EPICOIN_DEMO_SEED is not true: no demo data");
+        return Ok(());
+    }
+    let users: i64 = sqlx::query_scalar("SELECT count(*) FROM users")
+        .fetch_one(&db)
+        .await?;
+    if users > 0 {
+        tracing::info!(users, "the platform already has users: no demo data");
+        return Ok(());
+    }
+    let (state, _) = build_state(config, db)?;
+    // The node may still be starting.
+    for attempt in 1..=30 {
+        match state.chain.info().await {
+            Ok(_) => break,
+            Err(epicoin_api::chain::ChainError::Misconfigured(reason)) => bail!("{reason}"),
+            Err(error) if attempt == 30 => bail!("the node is not reachable: {error}"),
+            Err(_) => tokio::time::sleep(std::time::Duration::from_secs(1)).await,
+        }
+    }
+    let report = epicoin_api::demo::seed(&state, DEMO_PASSWORD).await?;
+    println!("Demo data created:");
+    println!(
+        "  {} students, {} products, {} distributions on chain",
+        report.students, report.products, report.mints
+    );
+    println!("  Demo accounts (password for all: {DEMO_PASSWORD}):");
+    for (role, email) in report.accounts {
+        println!("    {:<13} {email}", role.as_str());
+    }
     Ok(())
 }
 

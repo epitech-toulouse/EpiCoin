@@ -16,6 +16,7 @@ pub mod auth;
 pub mod authority;
 pub mod chain;
 pub mod config;
+pub mod demo;
 pub mod error;
 pub mod mailer;
 pub mod me;

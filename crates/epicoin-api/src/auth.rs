@@ -46,10 +46,11 @@ pub const CSRF_HEADER: &str = "x-csrf-token";
 
 const LOGIN_WINDOW: Duration = Duration::from_secs(15 * 60);
 const LOGIN_MAX_PER_ACCOUNT: u32 = 5;
-const LOGIN_MAX_PER_CLIENT: u32 = 30;
+// Generous: a whole campus can share one public address behind its NAT.
+const LOGIN_MAX_PER_CLIENT: u32 = 200;
 const RESET_WINDOW: Duration = Duration::from_secs(60 * 60);
 const RESET_MAX_PER_ACCOUNT: u32 = 3;
-const RESET_MAX_PER_CLIENT: u32 = 10;
+const RESET_MAX_PER_CLIENT: u32 = 30;
 
 pub const PURPOSE_INVITE: &str = "invite";
 pub const PURPOSE_RESET: &str = "reset";
