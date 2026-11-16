@@ -1,0 +1,35 @@
+# Décisions techniques
+
+Choix non imposés par la spécification, avec leur raison. À compléter au fil des phases.
+
+## Cadre général
+
+| # | Décision | Raison |
+|---|---|---|
+| G1 | Code et commits en anglais, interface et docs en français. | Validé avec le porteur du projet. |
+| G2 | Pas de `rust-toolchain.toml` ; on suit le Rust stable courant. | Rust est installé sans `rustup` sur le poste de dev ; la CI utilise `stable`. |
+| G3 | Ports par défaut 5433 (Postgres) et 8088 (web), configurables. | 5432 et 8080 sont déjà occupés sur le poste de dev. |
+
+## Chaîne (`epicoin-core`)
+
+| # | Décision | Raison |
+|---|---|---|
+| C1 | Hash BLAKE3 partout, avec un contexte de dérivation par usage (`crypto::domain`). | Un seul algorithme ; la séparation de domaine empêche de confondre deux hashes de natures différentes. |
+| C2 | Adresse = BLAKE3 (32 octets) de la clé publique ; la transaction porte `from` **et** `pubkey`. | La spec veut une adresse hashée ; il faut donc transporter la clé pour vérifier la signature. On vérifie que `hash(pubkey) == from`. |
+| C3 | La signature couvre `chain_id`, `from`, `pubkey`, `nonce`, `payload`. | Le `chain_id` empêche de rejouer une transaction d'une autre chaîne EpiCoin (dev vers prod). |
+| C4 | Identifiant de transaction = hash de l'encodage signé complet. | La racine de Merkle engage aussi les signatures. |
+| C5 | Vérification ed25519 stricte (`verify_strict`). | Refuse les signatures malléables et les clés faibles. |
+| C6 | Le genesis n'est pas un bloc : c'est une configuration dont le hash sert de `prev_hash` au bloc 1. | Évite un bloc 0 avec une signature factice. |
+| C7 | `state_root` = hash de l'état complet sérialisé (maps triées). | À quelques centaines de comptes, un arbre de Merkle sur l'état serait de la sur-ingénierie. |
+| C8 | Horodatages en millisecondes, strictement croissants d'un bloc au suivant. | Ordre total simple, y compris quand les blocs sont produits rapidement (tests). |
+| C9 | Quota de mint par fenêtres de durée fixe comptées depuis le genesis (30 jours par défaut), sans report. | Déterministe au rejeu, sans logique de calendrier ni de fuseau. |
+| C10 | Une autorité révoquée reste dans l'état (`active = false`). | Révoquer puis ré-autoriser dans la même période ne remet pas le compteur à zéro. |
+| C11 | Un encadrant ne peut pas minter vers lui-même. | Garde-fou élémentaire, une ligne de code. |
+| C12 | Remboursement intégral et unique ; l'état garde chaque achat (acheteur, montant, remboursé). | Empêche le double remboursement ; pas de remboursement partiel en V1. |
+| C13 | Les EPC dépensés s'accumulent sur le compte trésorerie ; pas de transaction `Burn`. `total_burned` existe et vaut 0. | Validé avec le porteur du projet ; le compteur garde la forme de l'invariant de masse monétaire. |
+| C14 | `Transfer` est dans le format mais toujours rejeté (`TransfersDisabled`). | L'activer plus tard ne change pas le format des transactions. |
+| C15 | Validateur attendu à la hauteur `h` : `validators[(h - 1) % n]`. | Round-robin prêt pour plusieurs validateurs ; avec `n = 1` c'est toujours le même. |
+| C16 | Une distribution groupée = N transactions `Mint`. | Pas de type de transaction supplémentaire. |
+| C17 | Motifs (`ReasonCode`) : participation, entraide, projet remarquable, événement, vie du campus, défi, autre. | Liste validée ; extensible en ajoutant à la fin. |
+| C18 | Les blocs vides sont valides. | Permet un heartbeat optionnel côté nœud. |
+| C19 | La clé admin est détenue en ligne par l'API (chiffrée). | Validé : nommer un encadrant se fait depuis l'interface. Contrepartie notée dans le modèle de menace. |

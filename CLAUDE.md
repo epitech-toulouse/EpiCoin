@@ -1,0 +1,89 @@
+# EpiCoin
+
+Monnaie virtuelle interne d'un campus Epitech, sur une blockchain privée en Rust (Proof of
+Authority). Les encadrants distribuent des EPC, les étudiants les dépensent dans une boutique.
+Environ 150 étudiants et 10 encadrants : la priorité est la simplicité et la robustesse, pas
+l'échelle.
+
+La spécification d'origine est résumée ici ; les choix techniques non triviaux sont consignés
+dans `docs/DECISIONS.md` (à compléter à chaque nouvelle décision).
+
+## Architecture
+
+```
+crates/
+  epicoin-core/   règles de la chaîne : types, crypto, transactions, blocs, machine d'état (lib pure, sans I/O)
+  epicoin-node/   nœud : mempool, production de blocs, stockage redb, API HTTP interne, mode réplica   (phase 2)
+  epicoin-api/    backend applicatif : auth, comptes, wallets custodiaux, boutique, admin              (phases 3-4)
+  epicoin-cli/    outils : genesis, vérification de la chaîne, administration                          (phase 2)
+web/              front React + TypeScript + Vite                                                    (phase 5)
+docs/             décisions, guides, modèle de menace
+```
+
+Flux : le front parle uniquement à `epicoin-api`. L'API détient les wallets (clés chiffrées),
+signe les transactions au nom des utilisateurs et les soumet au nœud. Le nœud valide, produit
+les blocs et les stocke. Postgres contient tout ce qui est hors chaîne (utilisateurs, sessions,
+boutique, audit).
+
+### Règles de la chaîne (`epicoin-core`)
+
+- Toutes les règles de validation sont dans `State::apply_tx` (`state.rs`) ; les règles de bloc
+  dans `Chain::apply_block` (`chain.rs`). Producteur et réplicas passent par le même code.
+- Tout ce qui est hashé ou signé est sérialisé en **borsh**. Le JSON (serde) ne sert qu'aux vues
+  de lecture et au fichier genesis.
+- Hash : BLAKE3 avec séparation de domaine (`crypto::domain`). Signatures : ed25519 strict.
+- Adresse = hash de la clé publique. Montants en `u64`, 1 EPC = 100 unités, arithmétique
+  `checked_*` uniquement, jamais de flottants.
+- Le genesis n'est pas un bloc : son hash est le `prev_hash` du bloc 1.
+- Types de transaction : `Mint`, `Purchase`, `Refund`, `AuthorityUpdate`, et `Transfer` qui
+  existe dans le format mais est toujours rejeté en V1.
+
+## Invariants à ne jamais casser
+
+- **RGPD** : aucune donnée personnelle ni texte libre sur la chaîne. Uniquement adresses,
+  montants, codes d'enum et hashes. Le lien adresse ↔ utilisateur vit seulement dans Postgres.
+- **Format gelé** : ne pas réordonner les champs des types borsh, ne pas changer un discriminant
+  d'enum ni une constante de `crypto::domain`. Les nouveaux `ReasonCode` s'ajoutent à la fin.
+- **Atomicité** : une transaction rejetée ne modifie pas l'état (vérifié par proptest).
+- **Masse monétaire** : `somme des soldes == total_minted - total_burned`.
+- **Secrets** : une clé privée n'est jamais loggée, jamais sérialisée en JSON, jamais renvoyée
+  par une API. `Keypair` n'implémente ni `Serialize` ni un `Debug` lisible.
+
+## Commandes
+
+```sh
+cargo build --workspace
+cargo test --workspace                     # tests unitaires, d'intégration et proptests
+cargo test -p epicoin-core                 # un seul crate
+cargo test -p epicoin-core --test state_machine mint   # un fichier / un filtre
+cargo fmt --all
+cargo clippy --workspace --all-targets -- -D warnings
+```
+
+Rust est installé via Homebrew (pas de `rustup`) : pas de `rust-toolchain.toml`, on suit le
+stable courant.
+
+## Conventions
+
+- Code, identifiants, commentaires et commits en **anglais** ; interface et documentation en
+  **français**.
+- Les tests s'écrivent en même temps que le code. Un comportement par test, nom descriptif.
+- Erreurs : `thiserror` dans les bibliothèques, `anyhow` uniquement dans les binaires.
+- Pas de `unwrap`/`expect` hors tests, sauf invariant documenté sur place.
+- Fin de phase : tests verts, `cargo fmt`, `cargo clippy -- -D warnings`, un commit.
+- En cas de choix non couvert par la spec : l'option la plus simple et standard, notée dans
+  `docs/DECISIONS.md`.
+
+## Environnement local
+
+Les ports 5432 et 8080 sont souvent déjà pris sur le poste de développement : les ports exposés
+par EpiCoin sont configurables et valent par défaut 5433 (Postgres) et 8088 (web).
+
+## Phases
+
+1. Core — fait
+2. Nœud, CLI, réplica
+3. API : auth, wallets, mint, audit
+4. Boutique
+5. Front React
+6. Déploiement et documentation

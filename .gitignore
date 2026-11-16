@@ -1,0 +1,19 @@
+# Rust
+/target
+
+# Front
+node_modules/
+web/dist/
+web/test-results/
+web/playwright-report/
+
+# Local configuration and secrets — never commit
+.env
+*.key
+/data/
+/backups/
+
+# Editors / OS
+.DS_Store
+.idea/
+.vscode/
