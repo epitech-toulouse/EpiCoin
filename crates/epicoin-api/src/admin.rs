@@ -72,8 +72,26 @@ struct ByRole {
     activated: i64,
 }
 
+#[derive(Serialize, sqlx::FromRow)]
+struct ShopTotals {
+    /// Orders paid and not cancelled.
+    orders: i64,
+    revenue: i64,
+    /// Orders cancelled and refunded.
+    refunded_orders: i64,
+    refunded: i64,
+}
+
+#[derive(Serialize, sqlx::FromRow)]
+struct ByProduct {
+    product_id: Uuid,
+    name: String,
+    quantity: i64,
+    revenue: i64,
+}
+
 /// The admin dashboard: money supply (from the chain), distribution by staff member and by
-/// reason, user counts.
+/// reason, shop sales, user counts.
 async fn stats(State(state): State<AppState>, current: CurrentUser) -> ApiResult<Json<Value>> {
     current.require(&[Role::Admin])?;
     let chain: StatusView = state.node.status().await?;
@@ -102,6 +120,25 @@ async fn stats(State(state): State<AppState>, current: CurrentUser) -> ApiResult
     .fetch_all(&state.db)
     .await?;
 
+    let shop = sqlx::query_as::<_, ShopTotals>(
+        "SELECT count(*) FILTER (WHERE status IN ('pending', 'ready', 'delivered')) AS orders, \
+                COALESCE(sum(total) FILTER (WHERE status IN ('pending', 'ready', 'delivered')), 0)::bigint AS revenue, \
+                count(*) FILTER (WHERE status = 'cancelled') AS refunded_orders, \
+                COALESCE(sum(total) FILTER (WHERE status = 'cancelled'), 0)::bigint AS refunded \
+         FROM orders",
+    )
+    .fetch_one(&state.db)
+    .await?;
+    let by_product = sqlx::query_as::<_, ByProduct>(
+        "SELECT i.product_id, max(i.product_name) AS name, sum(i.quantity)::bigint AS quantity, \
+                sum(i.quantity * i.unit_price)::bigint AS revenue \
+         FROM order_items i JOIN orders o ON o.id = i.order_id \
+         WHERE o.status IN ('pending', 'ready', 'delivered') \
+         GROUP BY i.product_id ORDER BY revenue DESC, name",
+    )
+    .fetch_all(&state.db)
+    .await?;
+
     Ok(Json(json!({
         "supply": {
             "total_minted": chain.total_minted,
@@ -112,6 +149,7 @@ async fn stats(State(state): State<AppState>, current: CurrentUser) -> ApiResult
         "chain": { "height": chain.height, "chain_id": chain.chain_id },
         "minted_by_staff": by_staff,
         "minted_by_reason": by_reason,
+        "shop": { "totals": shop, "by_product": by_product },
         "users": users,
     })))
 }

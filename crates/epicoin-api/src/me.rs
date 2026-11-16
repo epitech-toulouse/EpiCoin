@@ -43,6 +43,8 @@ struct HistoryRow {
     comment: Option<String>,
     /// Who granted the EPC, for a mint.
     from_name: Option<String>,
+    /// The shop order, for a purchase or a refund.
+    order_id: Option<uuid::Uuid>,
     #[serde(with = "time::serde::rfc3339")]
     created_at: OffsetDateTime,
 }
@@ -66,7 +68,7 @@ async fn transactions(
                 CASE WHEN c.kind = 'purchase' THEN 'debit' ELSE 'credit' END AS direction, \
                 c.reason_code, b.comment, \
                 CASE WHEN c.kind = 'mint' THEN a.first_name || ' ' || a.last_name END AS from_name, \
-                c.created_at \
+                c.order_id, c.created_at \
          FROM chain_txs c \
          LEFT JOIN mint_batches b ON b.id = c.batch_id \
          LEFT JOIN users a ON a.id = c.actor_user_id \

@@ -14,7 +14,7 @@ dans `docs/DECISIONS.md` (à compléter à chaque nouvelle décision).
 crates/
   epicoin-core/   règles de la chaîne : types, crypto, transactions, blocs, machine d'état (lib pure, sans I/O)
   epicoin-node/   nœud : mempool, production de blocs, stockage redb, API HTTP interne, mode réplica
-  epicoin-api/    backend applicatif : auth, comptes, wallets custodiaux, mint, admin (boutique : phase 4)
+  epicoin-api/    backend applicatif : auth, comptes, wallets custodiaux, mint, boutique, admin
   epicoin-cli/    outils : genesis, vérification de la chaîne, administration
 web/              front React + TypeScript + Vite                                                    (phase 5)
 docs/             décisions, guides, modèle de menace
@@ -60,6 +60,10 @@ boutique, audit).
 - `vault.rs` / `wallets.rs` : clés custodiales chiffrées ; `load_keypair` est le seul endroit où
   une clé privée existe en clair.
 - `authority.rs` : aligne les autorités de mint on-chain sur le rôle `staff`.
+- `shop/` : catalogue (`products.rs`) et commandes (`orders.rs`). Le paiement suit trois
+  temps (SQL : commande + stock + transaction signée ; soumission ; règlement dans
+  `orders::settle`, appelé par `ChainService::finalize`). Lire l'en-tête de `orders.rs` avant
+  d'y toucher.
 - `users.rs`, `mint.rs`, `me.rs`, `admin.rs` : endpoints par rôle. Erreurs en JSON
   `{error, message}` : `error` est un code stable, `message` un texte français pour l'interface.
 - Migrations SQL dans `crates/epicoin-api/migrations/`, appliquées au démarrage.
@@ -74,6 +78,9 @@ boutique, audit).
   d'enum ni une constante de `crypto::domain`. Les nouveaux `ReasonCode` s'ajoutent à la fin.
 - **Atomicité** : une transaction rejetée ne modifie pas l'état (vérifié par proptest).
 - **Masse monétaire** : `somme des soldes == total_minted - total_burned`.
+- **Commande ↔ chaîne** : le statut d'une commande ne change que dans `orders::settle` (issue
+  d'une transaction on-chain) ou par une transition explicite du gestionnaire. Le stock n'est
+  jamais modifié hors d'une transaction SQL qui modifie aussi la commande.
 - **Secrets** : une clé privée n'est jamais loggée, jamais sérialisée en JSON, jamais renvoyée
   par une API. `Keypair` n'implémente ni `Serialize` ni un `Debug` lisible. Les jetons (session,
   invitation, réinitialisation) ne passent jamais dans une URL. Le test
@@ -138,6 +145,6 @@ par EpiCoin sont configurables et valent par défaut 5433 (Postgres) et 8088 (we
 1. Core — fait
 2. Nœud, CLI, réplica — fait
 3. API : auth, wallets, mint, audit — fait
-4. Boutique
+4. Boutique — fait
 5. Front React
 6. Déploiement et documentation

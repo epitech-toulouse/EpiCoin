@@ -1,6 +1,7 @@
 //! Configuration, read from environment variables (see `.env.example`).
 
 use std::net::SocketAddr;
+use std::path::PathBuf;
 use std::time::Duration;
 
 use anyhow::{bail, Context};
@@ -48,6 +49,8 @@ pub struct Settings {
     pub default_mint_quota: Amount,
     /// Take the client address from `X-Forwarded-For` (set when behind the nginx proxy).
     pub trust_proxy: bool,
+    /// Where product images are stored.
+    pub upload_dir: PathBuf,
 }
 
 impl Settings {
@@ -62,6 +65,7 @@ impl Settings {
             reset_ttl: Duration::from_secs(3600),
             default_mint_quota: 500 * epicoin_core::UNITS_PER_EPC,
             trust_proxy: false,
+            upload_dir: PathBuf::from("./data/uploads"),
         }
     }
 }
@@ -163,6 +167,9 @@ impl Config {
                 reset_ttl: hours("EPICOIN_RESET_TTL_HOURS", 1)?,
                 default_mint_quota,
                 trust_proxy: flag("EPICOIN_TRUST_PROXY", false)?,
+                upload_dir: get("EPICOIN_UPLOAD_DIR")
+                    .unwrap_or_else(|| "./data/uploads".into())
+                    .into(),
             },
         })
     }

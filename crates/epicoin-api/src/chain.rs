@@ -6,6 +6,10 @@
 //! refuses them for good. Since the bytes (and therefore the nonce) never change, a retry —
 //! after a timeout, a crash or a node restart — can never apply the transaction twice.
 //!
+//! When a transaction reaches its final status, the business effects that depend on it (an
+//! order becoming paid, stock being restored…) are applied in the same SQL transaction as
+//! the status change: see [`ChainService::finalize`].
+//!
 //! Nonces are allocated under a per-signer lock held from signature to submission, so a
 //! signer's transactions reach the node in nonce order. The lock is in-process: the API is
 //! meant to run as a single instance.
@@ -17,9 +21,9 @@ use std::time::Duration;
 use epicoin_core::{Address, Amount, Hash, Keypair, Transaction, TxError, TxKind, TxPayload};
 use epicoin_node::views::{StatusView, TxStatus};
 use epicoin_node::{ClientError, NodeClient};
-use sqlx::PgPool;
+use sqlx::{PgConnection, PgPool};
 use time::OffsetDateTime;
-use tokio::sync::OnceCell;
+use tokio::sync::{OnceCell, OwnedMutexGuard};
 use uuid::Uuid;
 
 /// Business context stored next to a transaction, for histories and statistics.
@@ -32,6 +36,8 @@ pub struct TxMeta {
     pub amount: Option<Amount>,
     pub reason_code: Option<String>,
     pub batch_id: Option<Uuid>,
+    /// The shop order this transaction pays or refunds.
+    pub order_id: Option<Uuid>,
 }
 
 /// A `chain_txs` row.
@@ -52,6 +58,7 @@ pub struct ChainTx {
     pub amount: Option<i64>,
     pub reason_code: Option<String>,
     pub batch_id: Option<Uuid>,
+    pub order_id: Option<Uuid>,
     pub created_at: OffsetDateTime,
     pub updated_at: OffsetDateTime,
 }
@@ -59,6 +66,11 @@ pub struct ChainTx {
 pub const STATUS_PENDING: &str = "pending";
 pub const STATUS_INCLUDED: &str = "included";
 pub const STATUS_FAILED: &str = "failed";
+
+pub const KIND_MINT: &str = "mint";
+pub const KIND_PURCHASE: &str = "purchase";
+pub const KIND_REFUND: &str = "refund";
+pub const KIND_AUTHORITY_UPDATE: &str = "authority_update";
 
 impl ChainTx {
     pub fn is_included(&self) -> bool {
@@ -110,6 +122,13 @@ impl From<ClientError> for ChainError {
     }
 }
 
+/// How a transaction ended.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Outcome {
+    Included { height: u64, timestamp_ms: u64 },
+    Failed(TxError),
+}
+
 /// What the API needs to know about the chain it talks to.
 #[derive(Debug, Clone)]
 pub struct ChainInfo {
@@ -129,10 +148,10 @@ pub struct ChainService {
 
 fn kind_name(kind: TxKind) -> &'static str {
     match kind {
-        TxKind::Mint => "mint",
-        TxKind::Purchase => "purchase",
-        TxKind::Refund => "refund",
-        TxKind::AuthorityUpdate => "authority_update",
+        TxKind::Mint => KIND_MINT,
+        TxKind::Purchase => KIND_PURCHASE,
+        TxKind::Refund => KIND_REFUND,
+        TxKind::AuthorityUpdate => KIND_AUTHORITY_UPDATE,
         TxKind::Transfer => "transfer",
     }
 }
@@ -152,6 +171,74 @@ pub fn error_code(error: &TxError) -> String {
 
 fn block_time(timestamp_ms: u64) -> Option<OffsetDateTime> {
     OffsetDateTime::from_unix_timestamp_nanos(i128::from(timestamp_ms) * 1_000_000).ok()
+}
+
+/// Stores a signed transaction as `pending`, in the caller's SQL transaction. The caller
+/// must commit before submitting it.
+pub async fn record_tx(
+    conn: &mut PgConnection,
+    tx: &Transaction,
+    meta: &TxMeta,
+) -> Result<(), sqlx::Error> {
+    sqlx::query(
+        "INSERT INTO chain_txs \
+         (hash, kind, signer_address, nonce, raw, status, actor_user_id, subject_user_id, \
+          amount, reason_code, batch_id, order_id) \
+         VALUES ($1, $2, $3, $4, $5, 'pending', $6, $7, $8, $9, $10, $11)",
+    )
+    .bind(tx.hash().to_string())
+    .bind(kind_name(tx.kind()))
+    .bind(tx.from.to_string())
+    .bind(tx.nonce as i64)
+    .bind(tx.to_bytes())
+    .bind(meta.actor_user_id)
+    .bind(meta.subject_user_id)
+    .bind(meta.amount.map(|a| a as i64))
+    .bind(meta.reason_code.as_deref())
+    .bind(meta.batch_id)
+    .bind(meta.order_id)
+    .execute(conn)
+    .await?;
+    Ok(())
+}
+
+/// Exclusive right to sign for one account: holds the signer's lock and hands out
+/// consecutive nonces. Drop it once the transactions are submitted.
+pub struct SignerSession<'a> {
+    service: &'a ChainService,
+    signer: &'a Keypair,
+    chain_id: String,
+    next_nonce: u64,
+    _guard: OwnedMutexGuard<()>,
+}
+
+impl SignerSession<'_> {
+    /// Signs `payload` with the next nonce. The transaction must then be recorded
+    /// ([`record_tx`]) and submitted ([`Self::submit`]), in that order.
+    pub fn sign(&mut self, payload: TxPayload) -> Transaction {
+        let tx = Transaction::sign(&self.chain_id, self.signer, self.next_nonce, payload);
+        self.next_nonce += 1;
+        tx
+    }
+
+    /// Hands a recorded transaction to the node, without waiting for a block.
+    ///
+    /// - `Ok(())`: accepted in the mempool.
+    /// - `Err(Rejected)`: refused by the state machine; the row is already finalized as
+    ///   failed, with its business effects undone.
+    /// - `Err(Unavailable)`: outcome unknown; the row stays pending and will be retried.
+    pub async fn submit(&self, tx: &Transaction) -> Result<(), ChainError> {
+        match self.service.node.submit(tx, None).await {
+            Ok(_) => Ok(()),
+            Err(ClientError::Rejected(error)) => {
+                self.service
+                    .finalize(&tx.hash(), Outcome::Failed(error.clone()))
+                    .await?;
+                Err(ChainError::Rejected(error))
+            }
+            Err(other) => Err(ChainError::Unavailable(other.to_string())),
+        }
+    }
 }
 
 impl ChainService {
@@ -206,6 +293,30 @@ impl ChainService {
             .clone()
     }
 
+    /// Takes the signer's lock and works out its next nonce.
+    pub async fn begin<'a>(&'a self, signer: &'a Keypair) -> Result<SignerSession<'a>, ChainError> {
+        let chain_id = self.info().await?.chain_id.clone();
+        let address = signer.address();
+        let guard = self.signer_lock(&address).lock_owned().await;
+
+        // Next nonce: what the node expects, unless we hold transactions it has not seen
+        // yet (recorded but not delivered — the reconciler will deliver them first).
+        let on_node = self.node.account(&address).await?.pending_nonce;
+        let ours: Option<i64> = sqlx::query_scalar(
+            "SELECT max(nonce) FROM chain_txs WHERE signer_address = $1 AND status = 'pending'",
+        )
+        .bind(address.to_string())
+        .fetch_one(&self.db)
+        .await?;
+        Ok(SignerSession {
+            service: self,
+            signer,
+            chain_id,
+            next_nonce: on_node.max(ours.map_or(0, |n| n as u64 + 1)),
+            _guard: guard,
+        })
+    }
+
     /// Signs, records and submits one transaction, then waits up to `wait` for its
     /// inclusion. A transaction refused by the chain is an error.
     ///
@@ -242,55 +353,49 @@ impl ChainService {
         if items.is_empty() {
             return Ok(Vec::new());
         }
-        let chain_id = self.info().await?.chain_id.clone();
-        let address = signer.address();
-        let lock = self.signer_lock(&address);
-        let guard = lock.lock().await;
-
-        // Next nonce: what the node expects, unless we hold transactions it has not seen
-        // yet (recorded but not delivered — the reconciler will deliver them first).
-        let on_node = self.node.account(&address).await?.pending_nonce;
-        let ours: Option<i64> = sqlx::query_scalar(
-            "SELECT max(nonce) FROM chain_txs WHERE signer_address = $1 AND status = 'pending'",
-        )
-        .bind(address.to_string())
-        .fetch_one(&self.db)
-        .await?;
-        let first_nonce = on_node.max(ours.map_or(0, |n| n as u64 + 1));
-
+        let mut session = self.begin(signer).await?;
         let mut hashes: Vec<Hash> = Vec::with_capacity(items.len());
         let mut node_down = None;
-        for (nonce, (payload, meta)) in (first_nonce..).zip(items) {
-            let tx = Transaction::sign(&chain_id, signer, nonce, payload);
-            let hash = tx.hash();
-            self.record(&tx, &meta).await?;
-            hashes.push(hash);
-
-            match self.node.submit(&tx, None).await {
-                Ok(_) => {}
-                Err(ClientError::Rejected(error)) => {
-                    self.mark_failed(&hash, &error).await?;
+        for (payload, meta) in items {
+            let tx = session.sign(payload);
+            let mut conn = self.db.acquire().await?;
+            record_tx(&mut conn, &tx, &meta).await?;
+            drop(conn);
+            hashes.push(tx.hash());
+            match session.submit(&tx).await {
+                Ok(()) => {}
+                Err(ChainError::Rejected(_)) => break,
+                Err(ChainError::Unavailable(reason)) => {
+                    node_down = Some(reason);
                     break;
                 }
-                Err(other) => {
-                    // Unknown outcome: keep the row pending, stop here.
-                    node_down = Some(other.to_string());
-                    break;
-                }
+                Err(other) => return Err(other),
             }
         }
-        drop(guard);
+        drop(session);
 
         if let Some(reason) = node_down {
             tracing::warn!(%reason, "node unreachable while submitting; will retry");
         } else {
-            self.settle(&hashes, wait).await?;
+            self.wait_final(&hashes, wait).await?;
         }
-        self.rows(&hashes).await
+        let mut rows = Vec::with_capacity(hashes.len());
+        for hash in &hashes {
+            rows.push(self.row(hash).await?);
+        }
+        Ok(rows)
     }
 
-    /// Waits up to `wait` for `hashes` to be included, updating their rows.
-    async fn settle(&self, hashes: &[Hash], wait: Duration) -> Result<(), ChainError> {
+    /// The stored row of a transaction this API recorded.
+    pub async fn row(&self, hash: &Hash) -> Result<ChainTx, sqlx::Error> {
+        sqlx::query_as::<_, ChainTx>("SELECT * FROM chain_txs WHERE hash = $1")
+            .bind(hash.to_string())
+            .fetch_one(&self.db)
+            .await
+    }
+
+    /// Waits up to `wait` for `hashes` to reach a final status, finalizing each as it does.
+    pub async fn wait_final(&self, hashes: &[Hash], wait: Duration) -> Result<(), ChainError> {
         let deadline = tokio::time::Instant::now() + wait;
         let mut remaining: Vec<Hash> = hashes.to_vec();
         loop {
@@ -300,8 +405,19 @@ impl ChainService {
                     Ok(Some(view)) => match view.status {
                         TxStatus::Included {
                             height, timestamp, ..
-                        } => self.mark_included(hash, height, timestamp).await?,
-                        TxStatus::Rejected { error } => self.mark_failed(hash, &error).await?,
+                        } => {
+                            self.finalize(
+                                hash,
+                                Outcome::Included {
+                                    height,
+                                    timestamp_ms: timestamp,
+                                },
+                            )
+                            .await?;
+                        }
+                        TxStatus::Rejected { error } => {
+                            self.finalize(hash, Outcome::Failed(error)).await?;
+                        }
                         TxStatus::Pending | TxStatus::Unknown => still_pending.push(*hash),
                     },
                     // Unknown to the node or node unreachable: leave it to the reconciler.
@@ -317,69 +433,49 @@ impl ChainService {
         }
     }
 
-    async fn record(&self, tx: &Transaction, meta: &TxMeta) -> Result<(), sqlx::Error> {
-        sqlx::query(
-            "INSERT INTO chain_txs \
-             (hash, kind, signer_address, nonce, raw, status, actor_user_id, subject_user_id, \
-              amount, reason_code, batch_id) \
-             VALUES ($1, $2, $3, $4, $5, 'pending', $6, $7, $8, $9, $10)",
-        )
-        .bind(tx.hash().to_string())
-        .bind(kind_name(tx.kind()))
-        .bind(tx.from.to_string())
-        .bind(tx.nonce as i64)
-        .bind(tx.to_bytes())
-        .bind(meta.actor_user_id)
-        .bind(meta.subject_user_id)
-        .bind(meta.amount.map(|a| a as i64))
-        .bind(meta.reason_code.as_deref())
-        .bind(meta.batch_id)
-        .execute(&self.db)
-        .await?;
-        Ok(())
-    }
-
-    async fn mark_included(
-        &self,
-        hash: &Hash,
-        height: u64,
-        timestamp_ms: u64,
-    ) -> Result<(), sqlx::Error> {
-        sqlx::query(
-            "UPDATE chain_txs SET status = 'included', block_height = $2, block_time = $3, \
-             error = NULL, updated_at = now() WHERE hash = $1 AND status = 'pending'",
-        )
-        .bind(hash.to_string())
-        .bind(height as i64)
-        .bind(block_time(timestamp_ms))
-        .execute(&self.db)
-        .await?;
-        Ok(())
-    }
-
-    async fn mark_failed(&self, hash: &Hash, error: &TxError) -> Result<(), sqlx::Error> {
-        let json = serde_json::to_string(error).unwrap_or_else(|_| "{}".to_owned());
-        sqlx::query(
-            "UPDATE chain_txs SET status = 'failed', error = $2, updated_at = now() \
-             WHERE hash = $1 AND status = 'pending'",
-        )
-        .bind(hash.to_string())
-        .bind(json)
-        .execute(&self.db)
-        .await?;
-        Ok(())
-    }
-
-    async fn rows(&self, hashes: &[Hash]) -> Result<Vec<ChainTx>, ChainError> {
-        let mut rows = Vec::with_capacity(hashes.len());
-        for hash in hashes {
-            let row = sqlx::query_as::<_, ChainTx>("SELECT * FROM chain_txs WHERE hash = $1")
+    /// Records the final status of a transaction and, in the same SQL transaction, applies
+    /// what depends on it (see [`crate::shop::orders::settle`]).
+    ///
+    /// Idempotent: only a `pending` row is touched, so calling it twice — from a request
+    /// and from the reconciler, say — has effect once. Returns whether this call did it.
+    pub async fn finalize(&self, hash: &Hash, outcome: Outcome) -> Result<bool, sqlx::Error> {
+        let mut tx = self.db.begin().await?;
+        let updated: Option<(String, Option<Uuid>)> = match &outcome {
+            Outcome::Included {
+                height,
+                timestamp_ms,
+            } => {
+                sqlx::query_as(
+                    "UPDATE chain_txs SET status = 'included', block_height = $2, \
+                     block_time = $3, error = NULL, updated_at = now() \
+                     WHERE hash = $1 AND status = 'pending' RETURNING kind, order_id",
+                )
                 .bind(hash.to_string())
-                .fetch_one(&self.db)
-                .await?;
-            rows.push(row);
+                .bind(*height as i64)
+                .bind(block_time(*timestamp_ms))
+                .fetch_optional(&mut *tx)
+                .await?
+            }
+            Outcome::Failed(error) => {
+                let json = serde_json::to_string(error).unwrap_or_else(|_| "{}".to_owned());
+                sqlx::query_as(
+                    "UPDATE chain_txs SET status = 'failed', error = $2, updated_at = now() \
+                     WHERE hash = $1 AND status = 'pending' RETURNING kind, order_id",
+                )
+                .bind(hash.to_string())
+                .bind(json)
+                .fetch_optional(&mut *tx)
+                .await?
+            }
+        };
+        let Some((kind, order_id)) = updated else {
+            return Ok(false);
+        };
+        if let Some(order_id) = order_id {
+            crate::shop::orders::settle(&mut tx, &kind, order_id, &outcome).await?;
         }
-        Ok(rows)
+        tx.commit().await?;
+        Ok(true)
     }
 
     /// Settles the transactions that are still `pending` and older than `min_age`: asks the
@@ -404,8 +500,7 @@ impl ChainService {
                 continue;
             };
             let hash = tx.hash();
-            let lock = self.signer_lock(&tx.from);
-            let _guard = lock.lock().await;
+            let _guard = self.signer_lock(&tx.from).lock_owned().await;
 
             let status = match self.node.tx(&hash).await? {
                 Some(view) => view.status,
@@ -420,19 +515,21 @@ impl ChainService {
                 },
                 known => known,
             };
-            match status {
+            let outcome = match status {
                 TxStatus::Included {
                     height, timestamp, ..
-                } => {
-                    self.mark_included(&hash, height, timestamp).await?;
-                    settled += 1;
-                }
+                } => Outcome::Included {
+                    height,
+                    timestamp_ms: timestamp,
+                },
                 TxStatus::Rejected { error } => {
                     tracing::warn!(hash = %row.hash, %error, "transaction refused by the chain");
-                    self.mark_failed(&hash, &error).await?;
-                    settled += 1;
+                    Outcome::Failed(error)
                 }
-                TxStatus::Pending | TxStatus::Unknown => {}
+                TxStatus::Pending | TxStatus::Unknown => continue,
+            };
+            if self.finalize(&hash, outcome).await? {
+                settled += 1;
             }
         }
         Ok(settled)

@@ -377,6 +377,7 @@ async fn distribute(
                 amount: Some(body.amount),
                 reason_code: Some(reason.clone()),
                 batch_id: Some(batch_id),
+                order_id: None,
             },
         ));
     }

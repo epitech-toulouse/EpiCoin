@@ -133,6 +133,10 @@ impl TestApp {
             None,
         ));
 
+        let settings = Settings {
+            upload_dir: node_dir.path().join("uploads"),
+            ..settings
+        };
         let master_key_hex = MasterKey::generate_hex().to_string();
         let mailer = Arc::new(MemoryMailer::default());
         let state = AppState::new(

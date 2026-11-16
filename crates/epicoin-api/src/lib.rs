@@ -7,6 +7,7 @@
 //! - [`authority`]: keeps on-chain mint authorities in line with the `staff` role.
 //! - [`mint`]: staff distributions.
 //! - [`me`]: balance and history of the logged-in user.
+//! - [`shop`]: products, orders paid on chain, refunds.
 //! - [`admin`]: audit trail, statistics, blockchain explorer.
 
 pub mod admin;
@@ -22,6 +23,7 @@ pub mod mint;
 pub mod models;
 pub mod ratelimit;
 pub mod secrets;
+pub mod shop;
 pub mod state;
 pub mod users;
 pub mod vault;
@@ -50,6 +52,7 @@ pub fn router(state: AppState) -> Router {
         .nest("/staff", mint::router())
         .nest("/admin", users::admin_router().merge(admin::admin_router()))
         .nest("/explorer", admin::explorer_router())
+        .nest("/shop", shop::router())
         .fallback(|| async { ApiError::not_found("Ressource") });
     Router::new()
         .nest("/api", api)

@@ -75,3 +75,18 @@ Choix non imposés par la spécification, avec leur raison. À compléter au fil
 | A17 | Requêtes `sqlx` vérifiées à l'exécution (pas de macros `query!`) ; migrations embarquées et appliquées au démarrage. | Le projet compile sans base de données ; les requêtes sont couvertes par les tests d'intégration. |
 | A18 | Le mailer de développement (`console`) écrit le message complet, lien d'activation compris, dans les logs. | C'est son rôle en développement ; ne jamais l'utiliser en production (`EPICOIN_MAILER=smtp`). |
 | A19 | Le premier administrateur se crée en ligne de commande : `epicoin-api create-admin`, qui affiche son lien d'activation. | Pas de compte par défaut ni de mot de passe initial. |
+
+## Boutique (`epicoin-api::shop`)
+
+| # | Décision | Raison |
+|---|---|---|
+| S1 | Un achat se fait en trois temps : (1) une transaction SQL crée la commande `awaiting_payment`, prend le stock et enregistre le `Purchase` signé ; (2) la transaction est soumise au nœud ; (3) à son statut final, `ChainService::finalize` met à jour la commande **dans la même transaction SQL** que le statut de la transaction. | Postgres et la chaîne ne partagent pas de transaction : cet ordre garantit qu'une rupture de stock annule tout avant débit, et qu'un paiement refusé rend le stock. Un arrêt entre deux étapes est rattrapé par le réconciliateur. |
+| S2 | `Idempotency-Key` est **obligatoire** au paiement ; `(utilisateur, clé)` est unique dans `orders`. | Double clic ou retry retrouvent la commande existante : un seul débit. Vérifié y compris pour deux requêtes simultanées. |
+| S3 | Deux statuts internes s'ajoutent au cycle de la spec : `awaiting_payment` (paiement enregistré, pas encore confirmé) et `failed` (paiement refusé). L'annulation passe par `refunding` jusqu'à l'inclusion du `Refund`. | Rendent visibles les états intermédiaires au lieu de les cacher ; aucun n'est durable en fonctionnement normal. |
+| S4 | Le stock est pris dans la transaction SQL sous `SELECT … FOR UPDATE`, produits triés par identifiant. | Deux acheteurs du dernier article : un seul passe ; pas d'interblocage entre paniers. |
+| S5 | L'API vérifie le solde avant de créer la commande, mais c'est la chaîne qui tranche. | Message clair dans le cas courant ; deux commandes simultanées qui dépasseraient le solde sont arrêtées par la mempool. |
+| S6 | Un `Purchase` par commande, pour le total du panier ; `order_ref` = hash de l'identifiant de commande. | La chaîne ne révèle ni la commande ni les produits. |
+| S7 | Annulation possible depuis `pending` ou `ready`, jamais après `delivered` ; remboursement intégral ; le stock revient à l'inclusion du `Refund`. | Suit la règle on-chain (un seul remboursement, intégral). |
+| S8 | Les lignes de commande copient le nom et le prix du produit. Un produit déjà commandé ne peut plus être supprimé, seulement désactivé. | L'historique ne change pas quand le catalogue change. |
+| S9 | Images produit : envoi du fichier brut (2 Mo max), format reconnu par ses premiers octets (PNG, JPEG, WebP), nom généré par le serveur, servies sans authentification avec `nosniff`. | Pas de SVG ni de HTML déguisé ; aucun nom de fichier venant du client n'atteint le disque. |
+| S10 | Un administrateur peut faire tout ce que fait le gestionnaire de boutique. Seuls les étudiants achètent. | Petite équipe : l'admin dépanne. Les encadrants ne détiennent pas d'EPC. |
