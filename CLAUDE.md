@@ -16,7 +16,7 @@ crates/
   epicoin-node/   nœud : mempool, production de blocs, stockage redb, API HTTP interne, mode réplica
   epicoin-api/    backend applicatif : auth, comptes, wallets custodiaux, mint, boutique, admin
   epicoin-cli/    outils : genesis, vérification de la chaîne, administration
-web/              front React + TypeScript + Vite                                                    (phase 5)
+web/              front React + TypeScript + Vite
 docs/             décisions, guides, modèle de menace
 ```
 
@@ -70,6 +70,15 @@ boutique, audit).
 - Les tests d'intégration (`tests/`) utilisent un vrai Postgres (une base jetable par test via
   `#[sqlx::test]`) et un vrai nœud lancé en mémoire.
 
+### Front (`web/`)
+
+- `src/lib/api.ts` : seul point d'accès à l'API (jeton CSRF en mémoire, erreurs typées).
+  `src/lib/format.ts` : montants (entiers d'unités, jamais de flottants), dates, libellés.
+- `src/auth.tsx` (session), `src/cart.tsx` (panier + clé d'idempotence), `src/App.tsx`
+  (routes par rôle), `src/components/ui.tsx` (composants accessibles), `src/pages/<rôle>/`.
+- Toute l'interface est en français ; les textes d'erreur viennent de l'API (`message`).
+- `e2e/journey.spec.ts` : le parcours complet sur une pile réelle (`e2e/stack.mjs`).
+
 ## Invariants à ne jamais casser
 
 - **RGPD** : aucune donnée personnelle ni texte libre sur la chaîne. Uniquement adresses,
@@ -103,11 +112,19 @@ set -a; . ./data/dev/keys.env; set +a
 cargo run -p epicoin-node -- --genesis ./data/dev/genesis.json --data-dir ./data/dev/node
 
 # Auditer la chaîne (nœud en marche, ou base d'un nœud arrêté)
-cargo run -p epicoin-cli -- verify --genesis ./data/dev/genesis.json --node http://127.0.0.1:7000
+cargo run -p epicoin-cli -- verify --genesis ./data/dev/genesis.json --node http://127.0.0.1:7400
 cargo run -p epicoin-cli -- verify --genesis ./data/dev/genesis.json --data-dir ./data/dev/node
 ```
 
 Le dossier `data/` est ignoré par git : il contient des clés secrètes.
+
+```sh
+# Front
+cd web && npm install
+npm run dev                 # http://localhost:5173, relaie /api vers EPICOIN_API_URL (défaut :8090)
+npm run lint && npm run build && npm test
+npm run test:e2e            # pile complète jetable ; Postgres de docker compose requis
+```
 
 ```sh
 # Lancer l'API en local (nœud démarré comme ci-dessus)
@@ -146,5 +163,5 @@ par EpiCoin sont configurables et valent par défaut 5433 (Postgres) et 8088 (we
 2. Nœud, CLI, réplica — fait
 3. API : auth, wallets, mint, audit — fait
 4. Boutique — fait
-5. Front React
+5. Front React — fait
 6. Déploiement et documentation

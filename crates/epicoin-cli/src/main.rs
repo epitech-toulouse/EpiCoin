@@ -71,7 +71,7 @@ struct NodeArgs {
     #[arg(
         long,
         env = "EPICOIN_NODE_URL",
-        default_value = "http://127.0.0.1:7000"
+        default_value = "http://127.0.0.1:7400"
     )]
     node: String,
 }

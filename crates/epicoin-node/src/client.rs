@@ -37,7 +37,7 @@ pub struct NodeClient {
 }
 
 impl NodeClient {
-    /// `base_url` is e.g. `http://node:7000`.
+    /// `base_url` is e.g. `http://node:7400`.
     pub fn new(base_url: &str) -> Result<Self, ClientError> {
         let http = reqwest::Client::builder()
             // Longer than the node's maximum inclusion wait.

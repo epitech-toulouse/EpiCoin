@@ -8,7 +8,7 @@ Choix non imposés par la spécification, avec leur raison. À compléter au fil
 |---|---|---|
 | G1 | Code et commits en anglais, interface et docs en français. | Validé avec le porteur du projet. |
 | G2 | Pas de `rust-toolchain.toml` ; on suit le Rust stable courant. | Rust est installé sans `rustup` sur le poste de dev ; la CI utilise `stable`. |
-| G3 | Ports par défaut 5433 (Postgres) et 8088 (web), configurables. | 5432 et 8080 sont déjà occupés sur le poste de dev. |
+| G3 | Ports par défaut 5433 (Postgres), 7400 (nœud), 8090 (API) et 8088 (web), tous configurables. | 5432, 8000 et 8080 sont déjà occupés sur le poste de dev, et macOS réserve 7000 (AirPlay). |
 
 ## Chaîne (`epicoin-core`)
 
@@ -90,3 +90,18 @@ Choix non imposés par la spécification, avec leur raison. À compléter au fil
 | S8 | Les lignes de commande copient le nom et le prix du produit. Un produit déjà commandé ne peut plus être supprimé, seulement désactivé. | L'historique ne change pas quand le catalogue change. |
 | S9 | Images produit : envoi du fichier brut (2 Mo max), format reconnu par ses premiers octets (PNG, JPEG, WebP), nom généré par le serveur, servies sans authentification avec `nosniff`. | Pas de SVG ni de HTML déguisé ; aucun nom de fichier venant du client n'atteint le disque. |
 | S10 | Un administrateur peut faire tout ce que fait le gestionnaire de boutique. Seuls les étudiants achètent. | Petite équipe : l'admin dépanne. Les encadrants ne détiennent pas d'EPC. |
+
+## Front (`web/`)
+
+| # | Décision | Raison |
+|---|---|---|
+| F1 | React + TypeScript + Vite, TanStack Query, Tailwind CSS v4, sans bibliothèque de composants : une douzaine de composants maison accessibles dans `components/ui.tsx` (le `<dialog>` natif pour les modales). | shadcn/ui suppose Radix et un générateur de code : trop de dépendances pour une douzaine d'écrans. |
+| F2 | TypeScript 6 et non 7. | `typescript-eslint` ne supporte pas encore TypeScript 7. |
+| F3 | Le navigateur ne parle qu'à sa propre origine : `/api` est relayé par Vite en dev, par nginx en production. | Cookies `SameSite` et CSRF simples, pas de CORS. |
+| F4 | Le jeton CSRF reste en mémoire ; rien de secret n'est stocké par la page. Le panier et la clé d'idempotence du paiement vont dans `sessionStorage`. | Le cookie de session est `HttpOnly` ; le panier survit à un rechargement de l'onglet, pas plus. |
+| F5 | Chaque paiement et chaque distribution porte une clé d'idempotence générée côté navigateur, conservée après une erreur réseau et renouvelée après un refus définitif ou une modification. | Un nouvel essai après une coupure ne débite ni ne distribue deux fois. |
+| F6 | Les montants sont des entiers d'unités ; `parseEpc` convertit le texte saisi sans passer par les flottants. | Pas d'erreur d'arrondi (`0,1 + 0,2`). |
+| F7 | Les données sont rechargées à chaque affichage d'écran (`staleTime: 0`) ; les files de travail se rafraîchissent périodiquement. | Soldes, stock et commandes sont modifiés par d'autres personnes ; un écran ne doit jamais montrer un état périmé. |
+| F8 | Toute réponse 401 `unauthorized` ramène à l'écran de connexion et vide les données en mémoire. | Session expirée, désactivée ou fermée dans un autre onglet. |
+| F9 | Le jeton d'un lien reçu par email est lu dans le fragment d'URL. | Voir A5. |
+| F10 | Les tests E2E lancent une pile complète et jetable (`e2e/stack.mjs` : nouvelle chaîne, nouvelle base, nœud, API, front compilé) ; les emails sont lus dans le journal du mailer console. | Le parcours est testé de bout en bout sur les vrais binaires, sans service SMTP. |

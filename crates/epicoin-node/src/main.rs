@@ -31,10 +31,10 @@ struct Args {
     genesis: PathBuf,
 
     /// Address the HTTP API listens on. Keep it on a private network.
-    #[arg(long, env = "EPICOIN_NODE_LISTEN", default_value = "127.0.0.1:7000")]
+    #[arg(long, env = "EPICOIN_NODE_LISTEN", default_value = "127.0.0.1:7400")]
     listen: SocketAddr,
 
-    /// Replica mode: URL of the node to follow, e.g. http://node:7000.
+    /// Replica mode: URL of the node to follow, e.g. http://node:7400.
     #[arg(long, env = "EPICOIN_NODE_UPSTREAM")]
     upstream: Option<String>,
 

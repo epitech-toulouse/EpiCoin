@@ -146,7 +146,7 @@ impl Config {
 
         Ok(Self {
             database_url,
-            node_url: get("EPICOIN_NODE_URL").unwrap_or_else(|| "http://127.0.0.1:7000".into()),
+            node_url: get("EPICOIN_NODE_URL").unwrap_or_else(|| "http://127.0.0.1:7400".into()),
             listen,
             mailer,
             master_key: master("EPICOIN_MASTER_KEY", required("EPICOIN_MASTER_KEY")?)?,

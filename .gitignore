@@ -17,3 +17,6 @@ web/playwright-report/
 .DS_Store
 .idea/
 .vscode/
+
+# End-to-end test runtime files
+web/e2e/.stack.json
