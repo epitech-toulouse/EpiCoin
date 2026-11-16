@@ -13,9 +13,9 @@ dans `docs/DECISIONS.md` (à compléter à chaque nouvelle décision).
 ```
 crates/
   epicoin-core/   règles de la chaîne : types, crypto, transactions, blocs, machine d'état (lib pure, sans I/O)
-  epicoin-node/   nœud : mempool, production de blocs, stockage redb, API HTTP interne, mode réplica   (phase 2)
+  epicoin-node/   nœud : mempool, production de blocs, stockage redb, API HTTP interne, mode réplica
   epicoin-api/    backend applicatif : auth, comptes, wallets custodiaux, boutique, admin              (phases 3-4)
-  epicoin-cli/    outils : genesis, vérification de la chaîne, administration                          (phase 2)
+  epicoin-cli/    outils : genesis, vérification de la chaîne, administration
 web/              front React + TypeScript + Vite                                                    (phase 5)
 docs/             décisions, guides, modèle de menace
 ```
@@ -38,6 +38,18 @@ boutique, audit).
 - Types de transaction : `Mint`, `Purchase`, `Refund`, `AuthorityUpdate`, et `Transfer` qui
   existe dans le format mais est toujours rejeté en V1.
 
+### Nœud (`epicoin-node`)
+
+- `node.rs` : un seul `Mutex` protège la tête de chaîne, la mempool et le store. Écriture
+  disque d'abord, mémoire ensuite. Aucune section critique ne traverse un `.await`.
+- `store.rs` : un fichier redb ; bloc + index + instantané d'état écrits atomiquement.
+- `mempool.rs` : validation à l'arrivée contre l'état « en attente » ; non persistée.
+- `http.rs` / `client.rs` / `views.rs` : API interne (sans authentification, réseau privé),
+  son client et les formes JSON partagées. Les transactions circulent en borsh.
+- `replica.rs` : suit un nœud amont par HTTP en revérifiant chaque bloc.
+- `verify.rs` : rejeu complet depuis le genesis (utilisé par `epicoin-cli verify`).
+- Mode validateur si `EPICOIN_VALIDATOR_KEY` est défini, mode réplica si `--upstream` l'est.
+
 ## Invariants à ne jamais casser
 
 - **RGPD** : aucune donnée personnelle ni texte libre sur la chaîne. Uniquement adresses,
@@ -58,7 +70,18 @@ cargo test -p epicoin-core                 # un seul crate
 cargo test -p epicoin-core --test state_machine mint   # un fichier / un filtre
 cargo fmt --all
 cargo clippy --workspace --all-targets -- -D warnings
+
+# Créer une chaîne locale et lancer un nœud
+cargo run -p epicoin-cli -- genesis --chain-id epicoin-dev --out-dir ./data/dev
+set -a; . ./data/dev/keys.env; set +a
+cargo run -p epicoin-node -- --genesis ./data/dev/genesis.json --data-dir ./data/dev/node
+
+# Auditer la chaîne (nœud en marche, ou base d'un nœud arrêté)
+cargo run -p epicoin-cli -- verify --genesis ./data/dev/genesis.json --node http://127.0.0.1:7000
+cargo run -p epicoin-cli -- verify --genesis ./data/dev/genesis.json --data-dir ./data/dev/node
 ```
+
+Le dossier `data/` est ignoré par git : il contient des clés secrètes.
 
 Rust est installé via Homebrew (pas de `rustup`) : pas de `rust-toolchain.toml`, on suit le
 stable courant.
@@ -82,7 +105,7 @@ par EpiCoin sont configurables et valent par défaut 5433 (Postgres) et 8088 (we
 ## Phases
 
 1. Core — fait
-2. Nœud, CLI, réplica
+2. Nœud, CLI, réplica — fait
 3. API : auth, wallets, mint, audit
 4. Boutique
 5. Front React

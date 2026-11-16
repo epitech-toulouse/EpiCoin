@@ -12,6 +12,38 @@ pub type Amount = u64;
 /// Number of smallest units in one EPC.
 pub const UNITS_PER_EPC: Amount = 100;
 
+/// Formats an amount of units as EPC with two decimals, e.g. `1250` → `"12.50"`.
+pub fn format_epc(amount: Amount) -> String {
+    format!("{}.{:02}", amount / UNITS_PER_EPC, amount % UNITS_PER_EPC)
+}
+
+/// Parses a decimal EPC amount (`"12"`, `"12.5"`, `"12.50"`) into units, exactly — no
+/// floating point involved. Returns `None` for anything else, including more than two
+/// decimals or a value that does not fit.
+pub fn parse_epc(text: &str) -> Option<Amount> {
+    let (whole, fraction) = match text.split_once('.') {
+        Some((whole, fraction)) => (whole, fraction),
+        None => (text, ""),
+    };
+    let all_digits = |s: &str| s.bytes().all(|b| b.is_ascii_digit());
+    if whole.is_empty() || !all_digits(whole) || !all_digits(fraction) || fraction.len() > 2 {
+        return None;
+    }
+    if text.contains('.') && fraction.is_empty() {
+        return None;
+    }
+    let cents = match fraction.len() {
+        0 => 0,
+        1 => fraction.parse::<Amount>().ok()? * 10,
+        _ => fraction.parse::<Amount>().ok()?,
+    };
+    whole
+        .parse::<Amount>()
+        .ok()?
+        .checked_mul(UNITS_PER_EPC)?
+        .checked_add(cents)
+}
+
 /// Error returned when parsing a hex-encoded fixed-size value.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 #[error("expected {expected} hex-encoded bytes")]
@@ -106,6 +138,33 @@ bytes_newtype!(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn epc_formatting() {
+        assert_eq!(format_epc(0), "0.00");
+        assert_eq!(format_epc(5), "0.05");
+        assert_eq!(format_epc(1_250), "12.50");
+        assert_eq!(format_epc(100), "1.00");
+    }
+
+    #[test]
+    fn epc_parsing_is_exact() {
+        assert_eq!(parse_epc("12"), Some(1_200));
+        assert_eq!(parse_epc("12.5"), Some(1_250));
+        assert_eq!(parse_epc("12.50"), Some(1_250));
+        assert_eq!(parse_epc("0.07"), Some(7));
+        assert_eq!(parse_epc("0"), Some(0));
+        for bad in [
+            "", ".", "12.", ".5", "1.234", "-1", "+1", "1e3", "1,5", " 1", "abc",
+        ] {
+            assert_eq!(parse_epc(bad), None, "{bad:?} should not parse");
+        }
+        assert_eq!(parse_epc("184467440737095516.15"), Some(u64::MAX));
+        assert_eq!(parse_epc("184467440737095516.16"), None);
+        for amount in [0, 1, 99, 100, 101, 123_456_789] {
+            assert_eq!(parse_epc(&format_epc(amount)), Some(amount));
+        }
+    }
 
     #[test]
     fn hex_round_trip() {

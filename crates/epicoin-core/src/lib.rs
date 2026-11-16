@@ -28,4 +28,7 @@ pub use error::{BlockError, GenesisError, TxError};
 pub use genesis::{Genesis, DEFAULT_QUOTA_PERIOD_MS};
 pub use state::{Account, Authority, PurchaseRecord, State};
 pub use tx::{AuthorityAction, ReasonCode, Transaction, TxKind, TxPayload};
-pub use types::{Address, Amount, Hash, ParseHexError, PublicKey, Signature, UNITS_PER_EPC};
+pub use types::{
+    format_epc, parse_epc, Address, Amount, Hash, ParseHexError, PublicKey, Signature,
+    UNITS_PER_EPC,
+};

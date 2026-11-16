@@ -9,7 +9,7 @@ use borsh::BorshSerialize;
 use ed25519_dalek::{Signer, SigningKey, VerifyingKey};
 use zeroize::Zeroizing;
 
-use crate::types::{Address, Hash, PublicKey, Signature};
+use crate::types::{Address, Hash, ParseHexError, PublicKey, Signature};
 
 /// Domain-separation contexts. Changing any of these is a hard fork.
 pub mod domain {
@@ -86,6 +86,19 @@ impl Keypair {
         Zeroizing::new(self.signing.to_bytes())
     }
 
+    /// Parses a 64-character hex secret, as produced by [`Keypair::secret_hex`].
+    pub fn from_secret_hex(secret: &str) -> Result<Self, ParseHexError> {
+        let mut bytes = Zeroizing::new([0u8; 32]);
+        hex::decode_to_slice(secret.trim(), bytes.as_mut())
+            .map_err(|_| ParseHexError { expected: 32 })?;
+        Ok(Self::from_secret_bytes(&bytes))
+    }
+
+    /// The secret seed as hex, for key files and environment variables. Never log it.
+    pub fn secret_hex(&self) -> Zeroizing<String> {
+        Zeroizing::new(hex::encode(self.secret_bytes().as_ref()))
+    }
+
     pub fn public_key(&self) -> PublicKey {
         PublicKey(self.signing.verifying_key().to_bytes())
     }
@@ -152,6 +165,17 @@ mod tests {
         let restored = Keypair::from_secret_bytes(&kp.secret_bytes());
         assert_eq!(kp.public_key(), restored.public_key());
         assert_eq!(kp.address(), kp.public_key().address());
+    }
+
+    #[test]
+    fn keypair_round_trips_through_hex() {
+        let kp = Keypair::generate();
+        let hex = kp.secret_hex();
+        assert_eq!(hex.len(), 64);
+        let restored = Keypair::from_secret_hex(&format!("  {}\n", *hex)).unwrap();
+        assert_eq!(restored.address(), kp.address());
+        assert!(Keypair::from_secret_hex("abcd").is_err());
+        assert!(Keypair::from_secret_hex(&"zz".repeat(32)).is_err());
     }
 
     #[test]

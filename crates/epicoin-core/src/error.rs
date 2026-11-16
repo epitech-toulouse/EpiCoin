@@ -1,9 +1,15 @@
 //! Error types of the chain rules.
 
+use serde::{Deserialize, Serialize};
+
 use crate::types::{Amount, PublicKey};
 
 /// Why a transaction is rejected by the state machine.
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+///
+/// Serializes to JSON as `{"code": "bad_nonce", "expected": 1, "got": 0}` so that callers of
+/// the node API can react to a precise cause.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
+#[serde(tag = "code", rename_all = "snake_case")]
 pub enum TxError {
     #[error("the public key does not match the sender address")]
     AddressMismatch,

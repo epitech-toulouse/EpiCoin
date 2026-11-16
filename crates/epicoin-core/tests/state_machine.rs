@@ -389,3 +389,19 @@ fn state_round_trips_through_its_canonical_encoding() {
     assert_eq!(restored, s);
     assert_eq!(restored.root(), s.root());
 }
+
+#[test]
+fn errors_serialize_with_a_machine_readable_code() {
+    let err = TxError::BadNonce {
+        expected: 1,
+        got: 0,
+    };
+    let json = serde_json::to_value(&err).unwrap();
+    assert_eq!(json["code"], "bad_nonce");
+    assert_eq!(json["expected"], 1);
+    assert_eq!(serde_json::from_value::<TxError>(json).unwrap(), err);
+    assert_eq!(
+        serde_json::to_string(&TxError::TransfersDisabled).unwrap(),
+        r#"{"code":"transfers_disabled"}"#
+    );
+}
