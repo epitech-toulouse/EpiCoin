@@ -25,6 +25,7 @@ pub mod action {
     pub const CHALLENGE_UPDATED: &str = "challenges.updated";
     pub const CHALLENGE_REWARDED: &str = "challenges.rewarded";
     pub const CHALLENGE_SUBMISSION_REJECTED: &str = "challenges.submission_rejected";
+    pub const TRANSFER_SENT: &str = "transfers.sent";
     pub const PRODUCT_CREATED: &str = "shop.product_created";
     pub const PRODUCT_UPDATED: &str = "shop.product_updated";
     pub const PRODUCT_DELETED: &str = "shop.product_deleted";

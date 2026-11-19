@@ -27,7 +27,7 @@ Choix non imposés par la spécification, avec leur raison. À compléter au fil
 | C11 | Un encadrant ne peut pas minter vers lui-même. | Garde-fou élémentaire, une ligne de code. |
 | C12 | Remboursement intégral et unique ; l'état garde chaque achat (acheteur, montant, remboursé). | Empêche le double remboursement ; pas de remboursement partiel en V1. |
 | C13 | Les EPC dépensés s'accumulent sur le compte trésorerie ; pas de transaction `Burn`. `total_burned` existe et vaut 0. | Validé avec le porteur du projet ; le compteur garde la forme de l'invariant de masse monétaire. |
-| C14 | `Transfer` est dans le format mais toujours rejeté (`TransfersDisabled`). | L'activer plus tard ne change pas le format des transactions. |
+| C14 | V1 : `Transfer` est dans le format mais toujours rejeté (`TransfersDisabled`). **Révisé en V2** : `Transfer` est accepté, sauf depuis la trésorerie (`TreasuryCannotTransfer`) et vers soi-même (`SelfTransfer`) ; deux codes d'erreur ajoutés à la fin, `TransfersDisabled` conservé. | Le format des transactions ne change pas. Aucun bloc existant ne contient de `Transfer` (ils étaient refusés), donc tout l'historique se rejoue à l'identique ; en revanche un nœud V1 refuserait un bloc V2 : validateur et réplicas se mettent à jour ensemble. La trésorerie ne doit servir qu'aux remboursements. |
 | C15 | Validateur attendu à la hauteur `h` : `validators[(h - 1) % n]`. | Round-robin prêt pour plusieurs validateurs ; avec `n = 1` c'est toujours le même. |
 | C16 | Une distribution groupée = N transactions `Mint`. | Pas de type de transaction supplémentaire. |
 | C17 | Motifs (`ReasonCode`) : participation, entraide, projet remarquable, événement, vie du campus, défi, autre. | Liste validée ; extensible en ajoutant à la fin. |
@@ -102,6 +102,16 @@ Choix non imposés par la spécification, avec leur raison. À compléter au fil
 | C4 | Le quota du créateur est vérifié avant tout enregistrement : s'il ne suffit pas, l'étudiant est prié de réessayer et rien n'est écrit. | Pas de « gagnant non payé » à rattraper à la main. |
 | C5 | La réponse est stockée en Argon2id, comparée sans tenir compte de la casse ni des espaces, jamais renvoyée par l'API ; 5 essais par étudiant et par défi toutes les 15 minutes (limiteur en mémoire, voir A6). | Une fuite de la base ne livre pas les réponses ; deviner coûte du temps. Une réponse trop simple reste un risque laissé au créateur (le guide le dit). |
 | C6 | Chaque gain crée un lot `mint_batches` d'un destinataire, avec le commentaire « Défi : titre ». | L'étudiant lit le nom du défi dans son historique ; le créateur le retrouve dans ses distributions, sans nouvelle vue. |
+
+## Échanges entre étudiants (`epicoin-api::transfers`)
+
+| # | Décision | Raison |
+|---|---|---|
+| T1 | Un échange est un `Transfer` signé par la clé de l'envoyeur. Seuls les étudiants actifs envoient et reçoivent ; pas de plafond (choix du porteur du projet), seulement le solde. | Même chemin que les autres transactions (enregistrée avant envoi, rejouée jusqu'au statut final) ; la masse monétaire ne bouge pas. |
+| T2 | Le destinataire se cherche par nom, prénom ou email parmi les étudiants actifs, à partir de 2 caractères, 20 résultats au plus. | Choix du porteur du projet ; on ne livre pas la liste entière d'un coup. |
+| T3 | Message facultatif de 140 caractères dans la table `transfers`, jamais sur la chaîne ; effacé quand le compte de l'envoyeur ou du destinataire est supprimé. Les admins voient tous les échanges et leurs messages (menu Échanges). | RGPD (aucun texte libre on-chain) ; modération possible. |
+| T4 | Clé d'idempotence obligatoire, unique par envoyeur, comme au paiement (F5). | Un double clic ou un nouvel essai après une coupure n'envoie jamais deux fois. |
+| T5 | Dans `chain_txs`, l'envoyeur est l'`actor` et le destinataire le `subject` ; l'historique d'un étudiant liste ce qu'il reçoit et ce qu'il envoie. | Pas de colonne en plus pour les deux parties. |
 
 ## Front (`web/`)
 

@@ -281,7 +281,7 @@ fn validator_cannot_include_an_invalid_transaction() {
         chain.state(),
         &w.students[0],
         TxPayload::Transfer {
-            to: w.students[1].address(),
+            to: w.students[0].address(),
             amount: 1,
         },
     );
@@ -291,7 +291,7 @@ fn validator_cannot_include_an_invalid_transaction() {
             .unwrap_err(),
         BlockError::Tx {
             index: 0,
-            source: TxError::TransfersDisabled
+            source: TxError::SelfTransfer
         }
     );
 }

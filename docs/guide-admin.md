@@ -196,6 +196,9 @@ synchronisation suivante (5 minutes au plus). La gestion de la boutique lui est 
 - **Supprimer** un compte (droit à l'effacement) : nom, email, cohorte, sessions et clé du
   portefeuille sont effacés de la base. La chaîne garde l'adresse et ses mouvements, que plus
   rien ne relie à une personne. Les EPC restants deviennent inutilisables. Irréversible.
+- Les **échanges** entre étudiants (menu Échanges) : qui a envoyé combien à qui, avec le
+  message éventuel, pour modérer. Les messages sont effacés avec le compte de l'envoyeur ou du
+  destinataire.
 - Le **journal d'audit** (menu Audit) trace connexions, imports, changements de rôle et de
   quota, distributions, remboursements et suppressions, avec leur auteur et leur date. Il ne
   contient que des identifiants, jamais de nom ni d'email.
@@ -326,6 +329,11 @@ docker compose up -d --build
 ```
 
 Les migrations de la base s'appliquent au démarrage de l'API.
+
+Quand une version change les règles de la chaîne (c'est le cas de celle qui autorise les
+échanges entre étudiants), le validateur et les réplicas doivent tourner sur la même version :
+un réplica resté en arrière refuserait les nouveaux blocs. `docker compose up -d --build`
+met à jour tous les services d'un coup ; `epicoin-cli verify` doit lui aussi être à jour.
 
 ### Surveiller
 

@@ -353,21 +353,59 @@ fn refund_of_an_unknown_purchase_is_rejected() {
 
 // --- Transfers -------------------------------------------------------------------------
 
+fn transfer(to: &Keypair, amount: u64) -> TxPayload {
+    TxPayload::Transfer {
+        to: to.address(),
+        amount,
+    }
+}
+
 #[test]
-fn student_to_student_transfer_is_rejected() {
+fn transfer_moves_epc_without_creating_any() {
     let (w, mut s) = funded();
-    // Perfectly well-formed, signed, funded — and still refused in V1.
-    let t = tx(
-        &s,
-        &w.students[0],
-        TxPayload::Transfer {
-            to: w.students[1].address(),
-            amount: 100,
-        },
-    );
-    assert_eq!(rejected(&mut s, &t, T0), TxError::TransfersDisabled);
-    assert_eq!(s.balance(&w.students[0].address()), 500);
+    let minted = s.total_minted();
+    let t = tx(&s, &w.students[0], transfer(&w.students[1], 120));
+    s.apply_tx(&t, T0).unwrap();
+    assert_eq!(s.balance(&w.students[0].address()), 380);
+    assert_eq!(s.balance(&w.students[1].address()), 120);
+    assert_eq!(s.total_minted(), minted);
+    assert_eq!(s.nonce(&w.students[0].address()), 1);
+
+    // The whole balance can go.
+    let t = tx(&s, &w.students[1], transfer(&w.students[2], 120));
+    s.apply_tx(&t, T0).unwrap();
     assert_eq!(s.balance(&w.students[1].address()), 0);
+    assert_eq!(s.balance(&w.students[2].address()), 120);
+}
+
+#[test]
+fn transfer_beyond_the_balance_is_rejected() {
+    let (w, mut s) = funded();
+    let t = tx(&s, &w.students[0], transfer(&w.students[1], 501));
+    assert_eq!(
+        rejected(&mut s, &t, T0),
+        TxError::InsufficientBalance {
+            balance: 500,
+            needed: 501
+        }
+    );
+}
+
+#[test]
+fn transfer_to_oneself_or_of_nothing_is_rejected() {
+    let (w, mut s) = funded();
+    let t = tx(&s, &w.students[0], transfer(&w.students[0], 100));
+    assert_eq!(rejected(&mut s, &t, T0), TxError::SelfTransfer);
+    let t = tx(&s, &w.students[0], transfer(&w.students[1], 0));
+    assert_eq!(rejected(&mut s, &t, T0), TxError::ZeroAmount);
+}
+
+#[test]
+fn the_treasury_cannot_transfer() {
+    let (w, mut s) = funded();
+    buy(&mut s, &w.students[0], 300);
+    let t = tx(&s, &w.treasury, transfer(&w.students[1], 100));
+    assert_eq!(rejected(&mut s, &t, T0), TxError::TreasuryCannotTransfer);
 }
 
 // --- Determinism -----------------------------------------------------------------------

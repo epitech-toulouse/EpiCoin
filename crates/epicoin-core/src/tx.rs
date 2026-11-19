@@ -84,8 +84,8 @@ pub enum TxPayload {
         authority: Address,
         action: AuthorityAction,
     } = 3,
-    /// Account-to-account transfer. Part of the format, but rejected by the state machine in
-    /// V1.
+    /// Signed by the sender: moves EPC to another account. Refused in V1, allowed since V2
+    /// (never from the treasury, never to oneself).
     Transfer { to: Address, amount: Amount } = 4,
 }
 

@@ -46,13 +46,16 @@ export type ReasonCode =
 
 export interface HistoryLine {
   tx_hash: string;
-  kind: 'mint' | 'purchase' | 'refund';
+  kind: 'mint' | 'purchase' | 'refund' | 'transfer';
   status: 'included' | 'pending';
   amount: number | null;
   direction: 'credit' | 'debit';
   reason_code: ReasonCode | null;
   comment: string | null;
+  /** Who granted or sent the EPC (mint, received transfer). */
   from_name: string | null;
+  /** Who received the EPC (sent transfer). */
+  to_name: string | null;
   order_id: string | null;
   created_at: string;
 }
@@ -122,6 +125,34 @@ export interface ChallengeSubmission {
   reward_status: RewardStatus | null;
   submitted_at: string;
   decided_at: string | null;
+}
+
+export interface Recipient {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  promo: string;
+}
+
+export interface Transfer {
+  tx_hash: string;
+  status: 'included' | 'pending';
+  amount: number;
+  message: string;
+  recipient_id: string | null;
+  recipient_name: string | null;
+  created_at: string;
+}
+
+export interface AdminTransfer {
+  tx_hash: string;
+  status: 'included' | 'pending' | 'failed';
+  amount: number;
+  message: string;
+  sender_name: string | null;
+  recipient_name: string | null;
+  created_at: string;
 }
 
 export interface Quota {

@@ -68,7 +68,7 @@ fn action() -> impl Strategy<Value = Action> {
             .prop_map(|(to, amount, reason)| Action::Mint { to, amount, reason }),
         5 => (amount(), any::<u8>()).prop_map(|(amount, order)| Action::Purchase { amount, order }),
         3 => any::<usize>().prop_map(|purchase| Action::Refund { purchase }),
-        1 => (any::<usize>(), amount()).prop_map(|(to, amount)| Action::Transfer { to, amount }),
+        4 => (any::<usize>(), amount()).prop_map(|(to, amount)| Action::Transfer { to, amount }),
     ]
 }
 

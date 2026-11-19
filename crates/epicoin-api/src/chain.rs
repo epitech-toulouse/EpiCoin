@@ -71,6 +71,7 @@ pub const KIND_MINT: &str = "mint";
 pub const KIND_PURCHASE: &str = "purchase";
 pub const KIND_REFUND: &str = "refund";
 pub const KIND_AUTHORITY_UPDATE: &str = "authority_update";
+pub const KIND_TRANSFER: &str = "transfer";
 
 impl ChainTx {
     pub fn is_included(&self) -> bool {
@@ -152,7 +153,7 @@ fn kind_name(kind: TxKind) -> &'static str {
         TxKind::Purchase => KIND_PURCHASE,
         TxKind::Refund => KIND_REFUND,
         TxKind::AuthorityUpdate => KIND_AUTHORITY_UPDATE,
-        TxKind::Transfer => "transfer",
+        TxKind::Transfer => KIND_TRANSFER,
     }
 }
 

@@ -7,6 +7,7 @@
 //! - [`authority`]: keeps on-chain mint authorities in line with the distributing roles.
 //! - [`mint`]: distributions by staff and admins.
 //! - [`challenges`]: challenges whose winners are paid at once.
+//! - [`transfers`]: students sending EPC to each other.
 //! - [`me`]: balance and history of the logged-in user.
 //! - [`shop`]: products, orders paid on chain, refunds.
 //! - [`admin`]: audit trail, statistics, blockchain explorer.
@@ -28,6 +29,7 @@ pub mod ratelimit;
 pub mod secrets;
 pub mod shop;
 pub mod state;
+pub mod transfers;
 pub mod users;
 pub mod vault;
 pub mod wallets;
@@ -57,6 +59,7 @@ pub fn router(state: AppState) -> Router {
         .nest("/explorer", admin::explorer_router())
         .nest("/shop", shop::router())
         .merge(challenges::router())
+        .merge(transfers::router())
         .fallback(|| async { ApiError::not_found("Ressource") });
     Router::new()
         .nest("/api", api)

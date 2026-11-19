@@ -11,7 +11,7 @@ validateurs, connexion Microsoft 365…).
 | Les clés des portefeuilles | elles permettent de dépenser les EPC d'un utilisateur |
 | La clé maître | elle déchiffre toutes les clés des portefeuilles |
 | Les clés de la chaîne | administration (nommer des encadrants), trésorerie (rembourser), validateur (produire les blocs) |
-| Les données personnelles | nom, prénom, email, cohorte, historique d'achats, explications envoyées pour les défis |
+| Les données personnelles | nom, prénom, email, cohorte, historique d'achats et d'échanges, messages joints aux échanges, explications envoyées pour les défis |
 | Les comptes | sessions, mots de passe |
 
 ## Qui pourrait attaquer
@@ -37,6 +37,8 @@ validateurs, connexion Microsoft 365…).
 | Fuite de secrets dans les journaux ou les réponses | Les types secrets n'ont ni sérialisation ni affichage lisible ; un test parcourt toute l'API et vérifie qu'aucune clé, aucun mot de passe ni aucun jeton n'apparaît dans une réponse ou un journal. |
 | Deviner la réponse d'un défi | Réponse stockée en Argon2id et jamais renvoyée par l'API ; 5 essais par étudiant et par défi toutes les 15 minutes. |
 | Se faire payer deux fois un défi | Le gagnant et sa transaction de versement sont écrits ensemble, sous verrou : une seconde tentative, même simultanée, est refusée (testé). |
+| Envoyer des EPC à la place d'un autre étudiant | Un échange est signé par la clé de l'envoyeur, que seule l'API utilise, pour l'étudiant connecté (session + CSRF). La trésorerie ne peut pas transférer : son solde reste réservé aux remboursements. |
+| Messages injurieux joints aux échanges | Les administrateurs voient tous les échanges et leurs messages (menu Échanges) et peuvent désactiver un compte. |
 | Fichier malveillant envoyé comme image de produit | Format reconnu par le contenu (PNG, JPEG, WebP), nom choisi par le serveur, taille limitée, `nosniff`. |
 | Données personnelles exposées par la chaîne | Aucune donnée personnelle ni texte libre sur la chaîne (vérifié par des tests qui inspectent les blocs) ; la référence de commande est un hash opaque. Effacement d'un utilisateur possible dans la base. |
 
@@ -69,6 +71,10 @@ une plateforme de campus.
    données personnelles.
 8. **Données de démonstration.** Avec `EPICOIN_DEMO_SEED=true`, des comptes au mot de passe
    public sont créés. Le modèle `.env.example` le désactive ; ne jamais l'activer en production.
+9. **Échanges sans plafond.** Un étudiant peut envoyer tout son solde à qui il veut : racket ou
+   revente d'EPC contre de l'argent restent possibles. Choix assumé ; chaque échange est
+   visible des administrateurs et sur la chaîne. Un plafond par jour s'ajouterait côté API sans
+   toucher à la chaîne.
 
 ## Ce qui reste à la charge de l'exploitation
 

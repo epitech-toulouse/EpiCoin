@@ -23,6 +23,7 @@ const ACTIONS: Record<string, string> = {
   'auth.login': 'Connexion',
   'auth.account_activated': 'Compte activé',
   'auth.password_reset': 'Mot de passe réinitialisé',
+  'transfers.sent': 'Envoi d’EPC entre étudiants',
   'challenges.created': 'Défi créé',
   'challenges.updated': 'Défi modifié',
   'challenges.rewarded': 'Défi réussi, gain versé',

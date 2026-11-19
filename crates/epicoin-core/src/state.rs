@@ -296,8 +296,34 @@ impl State {
                 self.authorities.insert(*authority, updated);
             }
 
-            // Reserved for a later version: the format carries it, the rules refuse it.
-            TxPayload::Transfer { .. } => return Err(TxError::TransfersDisabled),
+            TxPayload::Transfer { to, amount } => {
+                // The treasury only gives back purchases: its balance must stay available
+                // for refunds.
+                if tx.from == self.genesis.treasury {
+                    return Err(TxError::TreasuryCannotTransfer);
+                }
+                if *to == tx.from {
+                    return Err(TxError::SelfTransfer);
+                }
+                if *amount == 0 {
+                    return Err(TxError::ZeroAmount);
+                }
+                let new_sender_balance =
+                    sender
+                        .balance
+                        .checked_sub(*amount)
+                        .ok_or(TxError::InsufficientBalance {
+                            balance: sender.balance,
+                            needed: *amount,
+                        })?;
+                let new_recipient_balance = self
+                    .balance(to)
+                    .checked_add(*amount)
+                    .ok_or(TxError::Overflow)?;
+
+                self.accounts.entry(tx.from).or_default().balance = new_sender_balance;
+                self.accounts.entry(*to).or_default().balance = new_recipient_balance;
+            }
         }
 
         self.accounts.entry(tx.from).or_default().nonce = next_nonce;

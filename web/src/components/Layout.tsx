@@ -1,6 +1,7 @@
 // The frame around every page of a logged-in user: blue top bar, sectioned side menu.
 
 import {
+  ArrowLeftRight,
   Blocks,
   ClipboardList,
   Gift,
@@ -10,6 +11,7 @@ import {
   Menu,
   Package,
   ScrollText,
+  Send,
   ShoppingBag,
   ShoppingCart,
   Store,
@@ -66,6 +68,7 @@ const MENUS: Record<Role, NavSection[]> = {
         { to: '/', label: 'Mon solde', icon: Wallet, color: 'text-brand-600', end: true },
         { to: '/commandes', label: 'Mes commandes', icon: ShoppingBag, color: 'text-accent' },
         { to: '/defis', label: 'Défis', icon: Trophy, color: 'text-ok' },
+        { to: '/envoyer', label: 'Envoyer des EPC', icon: Send, color: 'text-teal' },
       ],
     },
     {
@@ -91,6 +94,7 @@ const MENUS: Record<Role, NavSection[]> = {
       items: [
         { to: '/admin/utilisateurs', label: 'Utilisateurs', icon: Users, color: 'text-ok' },
         { to: '/admin/audit', label: 'Audit', icon: ScrollText, color: 'text-accent' },
+        { to: '/admin/echanges', label: 'Échanges', icon: ArrowLeftRight, color: 'text-teal' },
       ],
     },
     DISTRIBUTION,

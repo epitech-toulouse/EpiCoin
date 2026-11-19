@@ -43,10 +43,16 @@ pub enum TxError {
     UnknownPurchase,
     #[error("purchase already refunded")]
     AlreadyRefunded,
+    /// No longer produced: transfers were refused in V1 and are allowed since V2. Kept so
+    /// that every code ever stored still reads.
     #[error("transfers between accounts are disabled")]
     TransfersDisabled,
     #[error("arithmetic overflow")]
     Overflow,
+    #[error("an account cannot transfer to itself")]
+    SelfTransfer,
+    #[error("the shop treasury cannot make transfers")]
+    TreasuryCannotTransfer,
 }
 
 /// Why a genesis configuration is invalid.

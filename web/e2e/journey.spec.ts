@@ -367,6 +367,23 @@ test('a staff member posts a challenge and a student wins it', async () => {
   await expect(student.getByText('Défi : Énigme du campus')).toBeVisible();
 });
 
+test('a student sends EPC to a classmate, and the admin sees it', async () => {
+  await student.getByRole('link', { name: 'Envoyer des EPC' }).click();
+  await student.getByLabel('Rechercher un étudiant').fill('hopper');
+  await student.getByRole('button', { name: /Grace Hopper/ }).click();
+  await student.getByLabel('Montant (EPC)').fill('5');
+  await student.getByLabel('Message (facultatif)').fill('Merci pour ton aide !');
+  await student.getByRole('button', { name: /^Envoyer 5\s*EPC à Grace$/ }).click();
+  await expect(student.getByText(/5\s*EPC envoyés à Grace Hopper/)).toBeVisible();
+
+  await student.getByRole('link', { name: 'Mon solde' }).click();
+  await expect(student.getByTestId('balance')).toHaveText(/^35\s*EPC$/);
+  await expect(student.getByText('Envoyé à Grace Hopper')).toBeVisible();
+
+  await admin.getByRole('link', { name: 'Échanges' }).click();
+  await expect(admin.getByRole('cell', { name: 'Merci pour ton aide !' })).toBeVisible();
+});
+
 test('the interface is usable on a phone', async ({ browser }) => {
   const context = await browser.newContext({ viewport: { width: 375, height: 700 } });
   const phone = await context.newPage();

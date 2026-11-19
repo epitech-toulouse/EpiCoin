@@ -41,12 +41,23 @@ struct HistoryRow {
     direction: String,
     reason_code: Option<String>,
     comment: Option<String>,
-    /// Who granted the EPC, for a mint.
+    /// Who granted or sent the EPC, for a mint or a received transfer.
     from_name: Option<String>,
+    /// Who received the EPC, for a sent transfer.
+    to_name: Option<String>,
     /// The shop order, for a purchase or a refund.
     order_id: Option<uuid::Uuid>,
     #[serde(with = "time::serde::rfc3339")]
     created_at: OffsetDateTime,
+}
+
+/// The transactions that moved the balance of user `$1`: what they received or paid, and the
+/// transfers they sent. Failed ones never touched it.
+macro_rules! mine {
+    () => {
+        "((c.subject_user_id = $1 AND c.kind IN ('mint', 'purchase', 'refund', 'transfer')) \
+          OR (c.kind = 'transfer' AND c.actor_user_id = $1)) AND c.status <> 'failed'"
+    };
 }
 
 /// Everything that moved the user's balance, newest first. Failed transactions never
@@ -56,26 +67,30 @@ async fn transactions(
     current: CurrentUser,
     Query(page): Query<Page>,
 ) -> ApiResult<Json<Value>> {
-    let total: i64 = sqlx::query_scalar(
-        "SELECT count(*) FROM chain_txs c WHERE c.subject_user_id = $1 \
-         AND c.kind IN ('mint', 'purchase', 'refund') AND c.status <> 'failed'",
-    )
-    .bind(current.id())
-    .fetch_one(&state.db)
-    .await?;
-    let items = sqlx::query_as::<_, HistoryRow>(
+    let total: i64 =
+        sqlx::query_scalar(concat!("SELECT count(*) FROM chain_txs c WHERE ", mine!()))
+            .bind(current.id())
+            .fetch_one(&state.db)
+            .await?;
+    let items = sqlx::query_as::<_, HistoryRow>(concat!(
         "SELECT c.hash AS tx_hash, c.kind, c.status, c.amount, \
-                CASE WHEN c.kind = 'purchase' THEN 'debit' ELSE 'credit' END AS direction, \
-                c.reason_code, b.comment, \
-                CASE WHEN c.kind = 'mint' THEN a.first_name || ' ' || a.last_name END AS from_name, \
+                CASE WHEN c.kind = 'purchase' OR (c.kind = 'transfer' AND c.actor_user_id = $1) \
+                     THEN 'debit' ELSE 'credit' END AS direction, \
+                c.reason_code, COALESCE(b.comment, NULLIF(tr.message, '')) AS comment, \
+                CASE WHEN c.kind IN ('mint', 'transfer') AND c.subject_user_id = $1 \
+                     THEN a.first_name || ' ' || a.last_name END AS from_name, \
+                CASE WHEN c.kind = 'transfer' AND c.actor_user_id = $1 \
+                     THEN s.first_name || ' ' || s.last_name END AS to_name, \
                 c.order_id, c.created_at \
          FROM chain_txs c \
          LEFT JOIN mint_batches b ON b.id = c.batch_id \
+         LEFT JOIN transfers tr ON tr.tx_hash = c.hash \
          LEFT JOIN users a ON a.id = c.actor_user_id \
-         WHERE c.subject_user_id = $1 AND c.kind IN ('mint', 'purchase', 'refund') \
-           AND c.status <> 'failed' \
-         ORDER BY c.created_at DESC, c.nonce DESC LIMIT $2 OFFSET $3",
-    )
+         LEFT JOIN users s ON s.id = c.subject_user_id \
+         WHERE ",
+        mine!(),
+        " ORDER BY c.created_at DESC, c.nonce DESC LIMIT $2 OFFSET $3"
+    ))
     .bind(current.id())
     .bind(page.limit())
     .bind(page.offset())

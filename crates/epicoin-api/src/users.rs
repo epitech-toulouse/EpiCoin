@@ -719,6 +719,13 @@ async fn delete_user(
     let (user, address) = load_with_wallet(&state, id).await?;
 
     let mut tx = state.db.begin().await?;
+    // Messages of their transfers, sent or received, are free text about them.
+    sqlx::query(
+        "UPDATE transfers SET message = '' WHERE sender_user_id = $1 OR recipient_user_id = $1",
+    )
+    .bind(id)
+    .execute(&mut *tx)
+    .await?;
     sqlx::query("DELETE FROM users WHERE id = $1")
         .bind(id)
         .execute(&mut *tx)

@@ -40,8 +40,10 @@ boutique, audit).
 - Adresse = hash de la clé publique. Montants en `u64`, 1 EPC = 100 unités, arithmétique
   `checked_*` uniquement, jamais de flottants.
 - Le genesis n'est pas un bloc : son hash est le `prev_hash` du bloc 1.
-- Types de transaction : `Mint`, `Purchase`, `Refund`, `AuthorityUpdate`, et `Transfer` qui
-  existe dans le format mais est toujours rejeté en V1.
+- Types de transaction : `Mint`, `Purchase`, `Refund`, `AuthorityUpdate` et `Transfer`. Ce
+  dernier était refusé en V1 ; il est accepté depuis la V2 (échanges entre étudiants), sauf
+  depuis la trésorerie et vers soi-même. Toute règle de chaîne qui change impose de mettre à
+  jour validateur et réplicas ensemble.
 
 ### Nœud (`epicoin-node`)
 
@@ -73,6 +75,9 @@ boutique, audit).
 - `challenges.rs` : défis (réponse à trouver ou validation par un encadrant). Le gain est un
   `Mint` signé par le créateur du défi, sur son quota ; la participation `approved` et la
   transaction sont écrites ensemble. Lire l'en-tête du module avant d'y toucher.
+- `transfers.rs` : échanges entre étudiants (`Transfer` signé par l'envoyeur, clé
+  d'idempotence obligatoire). Le message reste dans la table `transfers`, jamais sur la chaîne,
+  et est effacé avec le compte de l'une ou l'autre partie.
 - Cohortes des étudiants : liste fermée `models::COHORTS` (code dans `users.promo`), seule
   source de la liste, y compris pour le front.
 - `users.rs`, `mint.rs`, `me.rs`, `admin.rs` : endpoints par rôle. Erreurs en JSON

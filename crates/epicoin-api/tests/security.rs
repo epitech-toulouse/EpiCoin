@@ -2,7 +2,7 @@
 
 mod common;
 
-use axum::http::StatusCode;
+use axum::http::{Method, StatusCode};
 use common::*;
 use epicoin_api::models::Role;
 use epicoin_api::vault::{MasterKey, Sealed, Vault};
@@ -122,6 +122,18 @@ async fn private_keys_never_appear_in_responses_or_logs(db: PgPool) {
         .await;
     assert_eq!(won.status, StatusCode::OK, "{:?}", won.body);
 
+    // A transfer: signed with Ada's key.
+    let bob = app.seed(Role::Student).await;
+    let sent = ada
+        .send(
+            Method::POST,
+            "/api/transfers",
+            Some(json!({ "recipient_id": bob.id, "amount": 100, "message": "Merci" })),
+            &[("idempotency-key", "security-transfer")],
+        )
+        .await;
+    assert_eq!(sent.status, StatusCode::CREATED, "{:?}", sent.body);
+
     for path in [
         "/api/auth/me",
         "/api/me/wallet",
@@ -131,6 +143,7 @@ async fn private_keys_never_appear_in_responses_or_logs(db: PgPool) {
         "/api/staff/students",
         "/api/staff/challenges",
         "/api/challenges",
+        "/api/transfers/recipients?q=nom",
     ] {
         ada.get(path).await;
         alan.get(path).await;
@@ -209,7 +222,7 @@ async fn private_keys_never_appear_in_responses_or_logs(db: PgPool) {
     for secret in wallet_secrets(&app).await {
         secrets.push(("a wallet private key".into(), secret));
     }
-    assert_eq!(secrets.len(), 3);
+    assert_eq!(secrets.len(), 4, "admin, Ada, Alan and Bob");
     for (name, keypair) in [
         ("the admin key", &app.admin_key),
         ("the treasury key", &app.treasury_key),

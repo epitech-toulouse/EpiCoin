@@ -40,6 +40,16 @@ function describe(line: HistoryLine): { title: string; detail: string | null } {
       return { title: 'Achat en boutique', detail: null };
     case 'refund':
       return { title: 'Remboursement', detail: 'Commande annulée' };
+    case 'transfer':
+      return line.direction === 'credit'
+        ? {
+            title: `Reçu de ${line.from_name ?? 'un ancien compte'}`,
+            detail: line.comment,
+          }
+        : {
+            title: `Envoyé à ${line.to_name ?? 'un ancien compte'}`,
+            detail: line.comment,
+          };
   }
 }
 
