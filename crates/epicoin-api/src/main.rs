@@ -216,7 +216,9 @@ async fn seed_demo(config: Config, db: PgPool) -> anyhow::Result<()> {
             Err(_) => tokio::time::sleep(std::time::Duration::from_secs(1)).await,
         }
     }
-    let report = epicoin_api::demo::seed(&state, DEMO_PASSWORD).await?;
+    // EPICOIN_DEMO_DISTRIBUTIONS=false: every balance starts at zero.
+    let distributions = std::env::var("EPICOIN_DEMO_DISTRIBUTIONS").as_deref() != Ok("false");
+    let report = epicoin_api::demo::seed(&state, DEMO_PASSWORD, distributions).await?;
     println!("Demo data created:");
     println!(
         "  {} students, {} products, {} distributions on chain",

@@ -111,6 +111,8 @@ services:
     environment:
       <<: *api-env
       EPICOIN_DEMO_SEED: ${EPICOIN_DEMO_SEED:-true}
+      # false: demo accounts, but no demo distributions (every balance starts at zero).
+      EPICOIN_DEMO_DISTRIBUTIONS: ${EPICOIN_DEMO_DISTRIBUTIONS:-true}
     volumes:
       - api-secrets:/secrets/api:ro
       - uploads:/uploads

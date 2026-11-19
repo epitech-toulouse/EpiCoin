@@ -9,7 +9,7 @@ use sqlx::PgPool;
 #[sqlx::test(migrator = "epicoin_api::MIGRATOR")]
 async fn demo_seed_builds_a_usable_platform(db: PgPool) {
     let app = TestApp::start(db).await;
-    let report = demo::seed(&app.state, "demo password").await.unwrap();
+    let report = demo::seed(&app.state, "demo password", true).await.unwrap();
     assert_eq!(report.students, 150);
     assert_eq!(report.products, 10);
     assert_eq!(report.mints, 5 * (20 + 10 + 5));
@@ -65,6 +65,26 @@ async fn demo_seed_builds_a_usable_platform(db: PgPool) {
     );
 
     // A second run is refused: demo data never lands on a platform in use.
-    assert!(demo::seed(&app.state, "demo password").await.is_err());
+    assert!(demo::seed(&app.state, "demo password", true).await.is_err());
     assert_eq!(count("SELECT count(*) FROM users").await, 157);
+}
+
+#[sqlx::test(migrator = "epicoin_api::MIGRATOR")]
+async fn demo_seed_can_start_every_balance_at_zero(db: PgPool) {
+    let app = TestApp::start(db).await;
+    let report = demo::seed(&app.state, "demo password", false)
+        .await
+        .unwrap();
+    assert_eq!(report.students, 150);
+    assert_eq!(report.mints, 0);
+
+    // Nobody holds anything, but the staff can distribute their full quota.
+    let status = app.node.status();
+    assert_eq!(status.total_minted, 0);
+    assert_eq!(status.circulating_supply, 0);
+    let authorities = app.node.authorities();
+    assert_eq!(authorities.iter().filter(|a| a.active).count(), 5);
+    assert!(authorities
+        .iter()
+        .all(|a| a.minted == 0 && a.remaining == a.quota));
 }

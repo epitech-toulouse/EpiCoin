@@ -34,7 +34,17 @@ Comptes de démonstration, tous avec le mot de passe **`epicoin-demo`** :
 | Encadrants | `encadrant1.demo@epitech.eu` … `encadrant5.demo@epitech.eu` |
 | Étudiant (un parmi 150) | `camille.martin@epitech.eu` |
 
-Pour tout effacer et repartir de zéro : `docker compose down --volumes`.
+Pour tout effacer et repartir de zéro : `docker compose down --volumes`, puis `docker compose up`.
+
+Deux réglages utiles pour la démo, dans un fichier `.env` à la racine :
+
+```sh
+EPICOIN_DEFAULT_MINT_QUOTA_EPC=5000   # quota de chaque encadrant par période de 30 jours (500 par défaut)
+EPICOIN_DEMO_DISTRIBUTIONS=false      # comptes de démo sans distributions : tous les soldes à zéro
+```
+
+Le quota se change à tout moment (redémarrer l'API : `docker compose up -d`) ; les
+distributions de démo ne comptent qu'à la création, donc après un `down --volumes`.
 
 ## Installer pour de vrai
 

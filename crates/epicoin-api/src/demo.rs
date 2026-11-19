@@ -222,7 +222,14 @@ pub struct SeedReport {
 }
 
 /// Fills an empty platform with demo data. Fails if any user already exists.
-pub async fn seed(state: &AppState, password: &str) -> anyhow::Result<SeedReport> {
+///
+/// With `distributions`, the staff also reward some students, so that balances, histories
+/// and the dashboard have content; without, every balance starts at zero.
+pub async fn seed(
+    state: &AppState,
+    password: &str,
+    distributions: bool,
+) -> anyhow::Result<SeedReport> {
     let existing: i64 = sqlx::query_scalar("SELECT count(*) FROM users")
         .fetch_one(&state.db)
         .await?;
@@ -309,7 +316,7 @@ pub async fn seed(state: &AppState, password: &str) -> anyhow::Result<SeedReport
 
     // --- Each staff member rewards a group of students. Different signers: in parallel.
     let mut tasks = Vec::new();
-    for (index, member) in staff.iter().enumerate() {
+    for (index, member) in staff.iter().enumerate().filter(|_| distributions) {
         let state = state.clone();
         let staff_id = member.id;
         // Each staff member follows a different slice of the students.
