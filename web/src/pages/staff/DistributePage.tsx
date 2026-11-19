@@ -176,8 +176,8 @@ export function DistributePage() {
         <div className="mb-6">
           <Alert tone="warning">
             Votre autorisation de distribution n'est pas encore active sur la blockchain. Elle le
-            devient en général moins d'une minute après votre nomination ; sinon, contactez un
-            administrateur.
+            devient en général moins d'une minute après l'attribution de votre rôle, au plus
+            quelques minutes ; sinon, contactez un administrateur.
           </Alert>
         </div>
       ) : (

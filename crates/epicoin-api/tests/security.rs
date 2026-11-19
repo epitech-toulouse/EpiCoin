@@ -76,11 +76,21 @@ async fn private_keys_never_appear_in_responses_or_logs(db: PgPool) {
     };
     let (ada_id, alan_id) = (id_of("ada@epitech.eu"), id_of("alan@epitech.eu"));
 
+    // The admin is an authority too: wait for Alan's own.
+    let alan_address: epicoin_core::Address = users.body["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|u| u["email"] == "alan@epitech.eu")
+        .and_then(|u| u["wallet_address"].as_str())
+        .unwrap()
+        .parse()
+        .unwrap();
     app.eventually("alan's authority", || {
         app.node
-            .authorities()
-            .iter()
-            .any(|authority| authority.active)
+            .account(&alan_address)
+            .authority
+            .is_some_and(|authority| authority.active)
     })
     .await;
     let minted = alan

@@ -195,7 +195,7 @@ impl TestApp {
     }
 
     /// Creates an activated user directly in the database (bypassing the invitation
-    /// email), with [`PASSWORD`]. Staff members get their on-chain authority.
+    /// email), with [`PASSWORD`]. Staff members and admins get their on-chain authority.
     pub async fn seed(&self, role: Role) -> Seeded {
         let n = self.counter.fetch_add(1, Ordering::SeqCst);
         let new = NewUser {
@@ -219,7 +219,7 @@ impl TestApp {
         let address = epicoin_api::wallets::address_of(&self.db, user.id)
             .await
             .unwrap();
-        if role == Role::Staff {
+        if role.distributes() {
             authority::sync_user(&self.state, &user, address, None)
                 .await
                 .unwrap();

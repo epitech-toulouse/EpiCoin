@@ -187,17 +187,65 @@ async fn a_student_cannot_mint(db: PgPool) {
 }
 
 #[sqlx::test(migrator = "epicoin_api::MIGRATOR")]
-async fn only_staff_can_mint(db: PgPool) {
+async fn only_staff_and_admins_can_mint(db: PgPool) {
     let app = TestApp::start(db).await;
     let student = app.seed(Role::Student).await;
-    for role in [Role::Admin, Role::ShopManager] {
+    for role in [Role::ShopManager, Role::Student] {
         let (mut client, _) = app.login_as(role).await;
         let reply = client
             .post("/api/staff/distributions", distribution(&[&student], 100))
             .await;
         assert_eq!(reply.status, StatusCode::FORBIDDEN, "as {role:?}");
+        assert_eq!(
+            client.get("/api/staff/quota").await.status,
+            StatusCode::FORBIDDEN,
+            "as {role:?}"
+        );
     }
     assert_eq!(app.balance(&student.address), 0);
+}
+
+#[sqlx::test(migrator = "epicoin_api::MIGRATOR")]
+async fn admins_distribute_like_staff(db: PgPool) {
+    let app = TestApp::start(db).await;
+    let (mut admin, admin_user) = app.login_as(Role::Admin).await;
+    let (mut student, student_user) = app.login_as(Role::Student).await;
+
+    // Same default quota as the staff.
+    let quota = admin.get("/api/staff/quota").await;
+    assert_eq!(quota.status, StatusCode::OK);
+    assert_eq!(quota.body["active"], true);
+    assert_eq!(quota.body["quota"], 50_000);
+
+    let reply = admin
+        .post(
+            "/api/staff/distributions",
+            distribution(&[&student_user], 2_000),
+        )
+        .await;
+    assert_eq!(reply.status, StatusCode::OK, "{:?}", reply.body);
+    assert_eq!(reply.body["status"], "included");
+    assert_eq!(app.balance(&student_user.address), 2_000);
+    assert_eq!(
+        admin.get("/api/staff/quota").await.body["remaining"],
+        48_000
+    );
+
+    // Signed with the admin's own wallet, and listed in their history.
+    let minted = admin.get("/api/staff/distributions").await;
+    assert_eq!(minted.body["total"], 1);
+    assert_eq!(
+        minted.body["items"][0]["recipient_id"],
+        student_user.id.to_string()
+    );
+    let signer: String =
+        sqlx::query_scalar("SELECT signer_address FROM chain_txs WHERE kind = 'mint'")
+            .fetch_one(&app.db)
+            .await
+            .unwrap();
+    assert_eq!(signer, admin_user.address.to_string());
+    let history = student.get("/api/me/transactions").await;
+    assert_eq!(history.body["items"][0]["amount"], 2_000);
 }
 
 #[sqlx::test(migrator = "epicoin_api::MIGRATOR")]

@@ -296,6 +296,21 @@ test('the administrator follows everything: statistics, chain and audit', async 
   await expect(admin.getByRole('cell', { name: 'Commande remboursée' })).toBeVisible();
 });
 
+test('the administrator distributes EPC too', async () => {
+  await admin.getByRole('link', { name: 'Distribuer', exact: true }).click();
+  await expect(admin.getByText('Quota restant')).toBeVisible();
+  await admin.getByLabel('Rechercher').fill('hopper');
+  await admin.getByRole('checkbox', { name: /Grace Hopper/ }).check();
+  await admin.getByLabel('Montant par étudiant (EPC)').fill('10');
+  await admin.getByLabel('Motif').selectOption({ label: 'Événement' });
+  await admin.getByRole('button', { name: 'Distribuer', exact: true }).click();
+  await expect(admin.getByText(/Distribution confirmée/)).toBeVisible();
+  await expect(admin.getByText(/^490\s*EPC$/).first()).toBeVisible();
+
+  await admin.getByRole('link', { name: 'Mes distributions' }).click();
+  await expect(admin.getByRole('cell', { name: 'Grace Hopper' })).toBeVisible();
+});
+
 test('logging out really ends the session', async () => {
   await student.getByRole('button', { name: 'Se déconnecter' }).click();
   await expect(student.getByRole('heading', { name: 'Connexion' })).toBeVisible();

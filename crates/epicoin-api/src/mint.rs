@@ -1,7 +1,7 @@
-//! Staff: distributing EPC to students.
+//! Staff and admins: distributing EPC to students.
 //!
-//! A distribution is one batch of on-chain `Mint` transactions, signed with the staff
-//! member's custodial key. The reason code goes on chain; the optional free-text comment
+//! A distribution is one batch of on-chain `Mint` transactions, signed with the
+//! distributor's custodial key. The reason code goes on chain; the optional free-text comment
 //! stays in Postgres.
 
 use std::collections::{HashMap, HashSet};
@@ -217,7 +217,7 @@ async fn quota_of(state: &AppState, address: &Address) -> ApiResult<QuotaView> {
 }
 
 async fn quota(State(state): State<AppState>, current: CurrentUser) -> ApiResult<Json<QuotaView>> {
-    current.require(&[Role::Staff])?;
+    current.require(&Role::DISTRIBUTORS)?;
     let address = wallets::address_of(&state.db, current.id()).await?;
     Ok(Json(quota_of(&state, &address).await?))
 }
@@ -254,7 +254,7 @@ async fn distribute(
     headers: HeaderMap,
     Json(body): Json<DistributeRequest>,
 ) -> ApiResult<Json<Value>> {
-    current.require(&[Role::Staff])?;
+    current.require(&Role::DISTRIBUTORS)?;
 
     // An idempotency key makes a double click or a retry return the first result.
     let idempotency_key = headers
@@ -517,13 +517,13 @@ struct DistributionRow {
     created_at: OffsetDateTime,
 }
 
-/// The staff member's own distributions, newest first.
+/// The distributor's own distributions, newest first.
 async fn history(
     State(state): State<AppState>,
     current: CurrentUser,
     Query(page): Query<Page>,
 ) -> ApiResult<Json<Value>> {
-    current.require(&[Role::Staff])?;
+    current.require(&Role::DISTRIBUTORS)?;
     let total: i64 = sqlx::query_scalar(
         "SELECT count(*) FROM chain_txs WHERE actor_user_id = $1 AND kind = 'mint'",
     )

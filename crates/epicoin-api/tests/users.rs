@@ -411,6 +411,25 @@ async fn staff_role_drives_the_on_chain_authority(db: PgPool) {
 }
 
 #[sqlx::test(migrator = "epicoin_api::MIGRATOR")]
+async fn admins_are_mint_authorities_too(db: PgPool) {
+    let app = TestApp::start(db).await;
+    let (mut admin, _) = app.login_as(Role::Admin).await;
+    let user = app.seed(Role::Student).await;
+    let address = user.address.to_string();
+    let path = format!("/api/admin/users/{}", user.id);
+
+    admin.patch(&path, json!({ "role": "admin" })).await;
+    assert_eq!(authority_of(&app, &address), Some((true, 50_000)));
+    // A personal quota applies to admins as well.
+    admin.patch(&path, json!({ "mint_quota": 80_000 })).await;
+    assert_eq!(authority_of(&app, &address), Some((true, 80_000)));
+
+    // The shop manager role does not distribute.
+    admin.patch(&path, json!({ "role": "shop_manager" })).await;
+    assert_eq!(authority_of(&app, &address), Some((false, 80_000)));
+}
+
+#[sqlx::test(migrator = "epicoin_api::MIGRATOR")]
 async fn disabling_a_user_ends_their_sessions(db: PgPool) {
     let app = TestApp::start(db).await;
     let (mut admin, _) = app.login_as(Role::Admin).await;

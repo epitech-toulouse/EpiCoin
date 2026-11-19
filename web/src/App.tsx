@@ -45,6 +45,7 @@ function Fallback() {
 }
 
 const MANAGERS: Role[] = ['shop_manager', 'admin'];
+const DISTRIBUTORS: Role[] = ['staff', 'admin'];
 
 export function App() {
   return (
@@ -61,8 +62,8 @@ export function App() {
         <Route path="/panier" element={<Protected roles={['student']}><CartPage /></Protected>} />
         <Route path="/commandes" element={<Protected roles={['student']}><OrdersPage /></Protected>} />
 
-        <Route path="/distribuer" element={<Protected roles={['staff']}><DistributePage /></Protected>} />
-        <Route path="/distributions" element={<Protected roles={['staff']}><DistributionsPage /></Protected>} />
+        <Route path="/distribuer" element={<Protected roles={DISTRIBUTORS}><DistributePage /></Protected>} />
+        <Route path="/distributions" element={<Protected roles={DISTRIBUTORS}><DistributionsPage /></Protected>} />
 
         <Route path="/gestion/commandes" element={<Protected roles={MANAGERS}><ManageOrdersPage /></Protected>} />
         <Route path="/gestion/produits" element={<Protected roles={MANAGERS}><ManageProductsPage /></Protected>} />

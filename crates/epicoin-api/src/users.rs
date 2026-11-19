@@ -387,13 +387,13 @@ async fn import(
     // Emails and chain transactions can take a while for a whole promotion: do not make
     // the admin's request wait for them.
     tokio::spawn(async move {
-        let has_staff = created.iter().any(|u| u.role == Role::Staff);
+        let has_distributors = created.iter().any(|u| u.role.distributes());
         for user in &created {
             if let Err(error) = send_invitation(&state, user).await {
                 tracing::warn!(user_id = %user.id, error = %error.message, "invitation not sent");
             }
         }
-        if has_staff {
+        if has_distributors {
             if let Err(error) = authority::sync_all(&state).await {
                 tracing::warn!(%error, "authority sync after import failed; will be retried");
             }
@@ -733,7 +733,7 @@ async fn delete_user(
     .await?;
     tx.commit().await?;
 
-    if user.role == Role::Staff {
+    if user.role.distributes() {
         if let Err(error) = authority::revoke(&state, address, Some(current.id())).await {
             tracing::warn!(%error, "authority of a deleted user not revoked yet; will be retried");
         }

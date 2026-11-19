@@ -1,7 +1,8 @@
 # EpiCoin
 
 Monnaie virtuelle interne d'un campus Epitech, sur une blockchain privée en Rust (Proof of
-Authority). Les encadrants distribuent des EPC, les étudiants les dépensent dans une boutique.
+Authority). Les encadrants (et les admins) distribuent des EPC, les étudiants les dépensent dans
+une boutique.
 Environ 150 étudiants et 10 encadrants : la priorité est la simplicité et la robustesse, pas
 l'échelle.
 
@@ -63,7 +64,8 @@ boutique, audit).
   session valide + jeton CSRF ; chaque handler appelle ensuite `current.require(&[Role::…])`.
 - `vault.rs` / `wallets.rs` : clés custodiales chiffrées ; `load_keypair` est le seul endroit où
   une clé privée existe en clair.
-- `authority.rs` : aligne les autorités de mint on-chain sur le rôle `staff`.
+- `authority.rs` : aligne les autorités de mint on-chain sur les rôles qui distribuent
+  (`Role::DISTRIBUTORS` : `staff` et `admin`).
 - `shop/` : catalogue (`products.rs`) et commandes (`orders.rs`). Le paiement suit trois
   temps (SQL : commande + stock + transaction signée ; soumission ; règlement dans
   `orders::settle`, appelé par `ChainService::finalize`). Lire l'en-tête de `orders.rs` avant

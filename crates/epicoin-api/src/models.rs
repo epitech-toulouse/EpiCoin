@@ -25,6 +25,13 @@ impl Role {
         }
     }
 
+    /// The roles that distribute EPC, each with an on-chain mint authority and a quota.
+    pub const DISTRIBUTORS: [Role; 2] = [Role::Staff, Role::Admin];
+
+    pub fn distributes(self) -> bool {
+        Self::DISTRIBUTORS.contains(&self)
+    }
+
     /// Parses the stored value, and the French names accepted in CSV imports.
     pub fn parse(text: &str) -> Option<Self> {
         match text.trim().to_lowercase().as_str() {

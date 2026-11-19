@@ -33,6 +33,8 @@ import type { AdminUser, Cohort, Paged, Role } from '../../lib/types';
 
 const PAGE = 50;
 const ROLES = Object.keys(ROLE_LABELS) as Role[];
+/** Roles that distribute EPC, with a quota. */
+const distributes = (role: Role) => role === 'staff' || role === 'admin';
 
 function useRefreshUsers() {
   const queryClient = useQueryClient();
@@ -267,7 +269,7 @@ function EditForm({ user, onDone }: { user: AdminUser; onDone: () => void }) {
         body: {
           role,
           disabled,
-          mint_quota: role === 'staff' ? quota : null,
+          mint_quota: distributes(role) ? quota : null,
           ...(promo !== user.promo && { promo }),
         },
       }),
@@ -310,7 +312,7 @@ function EditForm({ user, onDone }: { user: AdminUser; onDone: () => void }) {
       {(role === 'student' || user.promo !== '') && (
         <CohortField value={promo} onChange={setPromo} />
       )}
-      {role === 'staff' && (
+      {distributes(role) && (
         <TextField
           label="Quota de distribution par période (EPC)"
           inputMode="decimal"
@@ -481,7 +483,7 @@ export function UsersPage() {
                     <Td>{cohortLabel(user.promo)}</Td>
                     <Td>
                       {ROLE_LABELS[user.role]}
-                      {user.role === 'staff' && user.mint_quota !== null && (
+                      {distributes(user.role) && user.mint_quota !== null && (
                         <span className="block text-slate-600">
                           Quota : {formatEpc(user.mint_quota)}
                         </span>

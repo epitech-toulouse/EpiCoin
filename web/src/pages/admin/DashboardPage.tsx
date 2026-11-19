@@ -194,14 +194,14 @@ export function DashboardPage() {
           </Card>
 
           <Card>
-            <CardTitle icon={Users}>Distribué par encadrant</CardTitle>
+            <CardTitle icon={Users}>Distribué par personne</CardTitle>
             {minted_by_staff.length === 0 ? (
               <Empty>Aucune distribution pour l'instant.</Empty>
             ) : (
-              <Table caption="EPC distribués par encadrant" bare>
+              <Table caption="EPC distribués par personne" bare>
                 <thead>
                   <tr>
-                    <Th className="pl-0">Encadrant</Th>
+                    <Th className="pl-0">Encadrant ou admin</Th>
                     <Th className="text-right">Distributions</Th>
                     <Th className="text-right">Total</Th>
                     <Th className="w-1/3 pr-0">

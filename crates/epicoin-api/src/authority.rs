@@ -1,7 +1,8 @@
-//! Keeps on-chain mint authorities in line with the `staff` role.
+//! Keeps on-chain mint authorities in line with the roles that distribute EPC (`staff` and
+//! `admin`, see [`Role::DISTRIBUTORS`]).
 //!
-//! Postgres is the source of intent: a user who is `staff` and not disabled must be an
-//! active authority with their quota; everyone else must not be. [`sync_user`] applies that
+//! Postgres is the source of intent: a user with one of those roles who is not disabled must
+//! be an active authority with their quota; everyone else must not be. [`sync_user`] applies that
 //! for one user right after a change, and [`sync_all`] runs periodically so that a change
 //! made while the node was unreachable is caught up — the system converges by itself.
 
@@ -23,7 +24,7 @@ const WAIT: Duration = Duration::from_secs(20);
 
 /// The quota `user` should have on chain, or `None` if they must not be an authority.
 pub fn desired_quota(user: &User, settings: &Settings) -> Option<Amount> {
-    (user.role == Role::Staff && user.disabled_at.is_none()).then(|| {
+    (user.role.distributes() && user.disabled_at.is_none()).then(|| {
         user.mint_quota
             .map_or(settings.default_mint_quota, |q| q.max(0) as Amount)
     })
@@ -118,13 +119,15 @@ struct StaffRow {
 }
 
 /// Reconciles every authority: grants what is missing, fixes quotas, revokes authorities
-/// that no longer correspond to an active staff member (including deleted users). Returns
+/// that no longer correspond to an active distributor (including deleted users). Returns
 /// the number of transactions sent.
 pub async fn sync_all(state: &AppState) -> Result<usize, ChainError> {
+    let roles: Vec<&str> = Role::DISTRIBUTORS.into_iter().map(Role::as_str).collect();
     let staff = sqlx::query_as::<_, StaffRow>(
         "SELECT u.*, w.address FROM users u JOIN wallets w ON w.user_id = u.id \
-         WHERE u.role = 'staff'",
+         WHERE u.role = ANY($1)",
     )
+    .bind(&roles)
     .fetch_all(&state.db)
     .await?;
     let mut current: HashMap<Address, (bool, Amount)> = state

@@ -40,6 +40,14 @@ interface NavSection {
   items: NavItem[];
 }
 
+const DISTRIBUTION: NavSection = {
+  title: 'Distribution',
+  items: [
+    { to: '/distribuer', label: 'Distribuer', icon: Gift, color: 'text-brand-600' },
+    { to: '/distributions', label: 'Mes distributions', icon: History, color: 'text-accent' },
+  ],
+};
+
 const SHOP_MANAGEMENT: NavSection = {
   title: 'Boutique',
   items: [
@@ -65,15 +73,7 @@ const MENUS: Record<Role, NavSection[]> = {
       ],
     },
   ],
-  staff: [
-    {
-      title: 'Distribution',
-      items: [
-        { to: '/distribuer', label: 'Distribuer', icon: Gift, color: 'text-brand-600' },
-        { to: '/distributions', label: 'Mes distributions', icon: History, color: 'text-accent' },
-      ],
-    },
-  ],
+  staff: [DISTRIBUTION],
   shop_manager: [SHOP_MANAGEMENT],
   admin: [
     {
@@ -90,6 +90,7 @@ const MENUS: Record<Role, NavSection[]> = {
         { to: '/admin/audit', label: 'Audit', icon: ScrollText, color: 'text-accent' },
       ],
     },
+    DISTRIBUTION,
     SHOP_MANAGEMENT,
   ],
 };
