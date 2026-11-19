@@ -70,6 +70,9 @@ boutique, audit).
   temps (SQL : commande + stock + transaction signée ; soumission ; règlement dans
   `orders::settle`, appelé par `ChainService::finalize`). Lire l'en-tête de `orders.rs` avant
   d'y toucher.
+- `challenges.rs` : défis (réponse à trouver ou validation par un encadrant). Le gain est un
+  `Mint` signé par le créateur du défi, sur son quota ; la participation `approved` et la
+  transaction sont écrites ensemble. Lire l'en-tête du module avant d'y toucher.
 - Cohortes des étudiants : liste fermée `models::COHORTS` (code dans `users.promo`), seule
   source de la liste, y compris pour le front.
 - `users.rs`, `mint.rs`, `me.rs`, `admin.rs` : endpoints par rôle. Erreurs en JSON

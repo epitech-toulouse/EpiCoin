@@ -3,7 +3,7 @@
 // EPC amounts are integers in units (1 EPC = 100 units) everywhere in the code. Converting
 // from and to text is done on digits, never through floating-point arithmetic.
 
-import type { OrderStatus, ReasonCode, Role } from './types';
+import type { ChallengeMode, OrderStatus, ReasonCode, Role } from './types';
 
 export const UNITS_PER_EPC = 100;
 
@@ -71,6 +71,11 @@ export function cohortLabel(code: string): string {
   if (!program || !number) return code;
   return `${COHORT_PROGRAMS[program] ?? program.toUpperCase()} ${number}`;
 }
+
+export const CHALLENGE_MODE_LABELS: Record<ChallengeMode, string> = {
+  answer: 'Réponse à trouver',
+  review: 'Validé par un encadrant',
+};
 
 export const ROLE_LABELS: Record<Role, string> = {
   student: 'Étudiant',

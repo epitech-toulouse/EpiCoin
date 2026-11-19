@@ -92,6 +92,17 @@ Choix non imposés par la spécification, avec leur raison. À compléter au fil
 | S9 | Images produit : envoi du fichier brut (2 Mo max), format reconnu par ses premiers octets (PNG, JPEG, WebP), nom généré par le serveur, servies sans authentification avec `nosniff`. | Pas de SVG ni de HTML déguisé ; aucun nom de fichier venant du client n'atteint le disque. |
 | S10 | Un administrateur peut faire tout ce que fait le gestionnaire de boutique. Seuls les étudiants achètent. | Petite équipe : l'admin dépanne. Les encadrants ne détiennent pas d'EPC. |
 
+## Défis (`epicoin-api::challenges`)
+
+| # | Décision | Raison |
+|---|---|---|
+| C1 | Deux modes au choix par défi : réponse à trouver (vérifiée par l'API, gain immédiat) ou validation par un encadrant. Créés par les encadrants et les admins ; un admin voit et gère tous les défis. | Couvre les énigmes et quiz (automatique) comme les défis concrets (animer un atelier), sans écran de plus pour l'étudiant. |
+| C2 | Le gain est un `Mint` signé par le **créateur** du défi, motif `challenge`, compté sur son quota. Aucune clé ni autorité propre aux défis. | Le format de la chaîne ne change pas ; toute émission reste plafonnée par le quota d'une personne et apparaît dans ses distributions et les statistiques. |
+| C3 | Le statut `approved` d'une participation et la transaction de versement sont écrits dans la même transaction SQL, sous le verrou du signataire et un `FOR UPDATE` sur le défi. Un versement refusé par la chaîne rend la participation à nouveau payable. | Un gagnant est payé exactement une fois, même avec deux réponses simultanées (testé) ; la limite de gagnants tient. |
+| C4 | Le quota du créateur est vérifié avant tout enregistrement : s'il ne suffit pas, l'étudiant est prié de réessayer et rien n'est écrit. | Pas de « gagnant non payé » à rattraper à la main. |
+| C5 | La réponse est stockée en Argon2id, comparée sans tenir compte de la casse ni des espaces, jamais renvoyée par l'API ; 5 essais par étudiant et par défi toutes les 15 minutes (limiteur en mémoire, voir A6). | Une fuite de la base ne livre pas les réponses ; deviner coûte du temps. Une réponse trop simple reste un risque laissé au créateur (le guide le dit). |
+| C6 | Chaque gain crée un lot `mint_batches` d'un destinataire, avec le commentaire « Défi : titre ». | L'étudiant lit le nom du défi dans son historique ; le créateur le retrouve dans ses distributions, sans nouvelle vue. |
+
 ## Front (`web/`)
 
 | # | Décision | Raison |

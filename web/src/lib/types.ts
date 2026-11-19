@@ -72,6 +72,58 @@ export interface Cohort {
   students: number;
 }
 
+export type ChallengeMode = 'answer' | 'review';
+export type RewardStatus = 'pending' | 'included' | 'failed';
+
+export interface Challenge {
+  id: string;
+  title: string;
+  description: string;
+  /** Per winner, in units. */
+  reward: number;
+  mode: ChallengeMode;
+  /** Empty: every student. */
+  cohorts: string[];
+  max_winners: number | null;
+  closes_at: string | null;
+  /** Takes participations right now. */
+  open: boolean;
+  winners: number;
+  creator_name: string | null;
+  created_at: string;
+}
+
+export interface StudentChallenge extends Challenge {
+  submission: {
+    status: 'pending' | 'approved' | 'rejected';
+    proof: string;
+    review_note: string;
+    reward_status: RewardStatus | null;
+  } | null;
+}
+
+export interface ManagedChallenge extends Challenge {
+  creator_id: string | null;
+  /** Closed by hand. */
+  closed: boolean;
+  /** Participations waiting for a review. */
+  pending: number;
+}
+
+export interface ChallengeSubmission {
+  id: string;
+  student_id: string;
+  student_name: string;
+  student_email: string;
+  student_promo: string;
+  status: 'pending' | 'approved' | 'rejected';
+  proof: string;
+  review_note: string;
+  reward_status: RewardStatus | null;
+  submitted_at: string;
+  decided_at: string | null;
+}
+
 export interface Quota {
   active: boolean;
   quota: number;

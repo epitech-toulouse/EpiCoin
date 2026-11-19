@@ -576,7 +576,7 @@ async fn create_one(
     ))
 }
 
-fn capitalize(message: &str) -> String {
+pub(crate) fn capitalize(message: &str) -> String {
     let mut chars = message.chars();
     match chars.next() {
         Some(first) => format!("{}{}.", first.to_uppercase(), chars.as_str()),
@@ -596,7 +596,7 @@ struct UpdateRequest {
 }
 
 /// Distinguishes "field absent" (`None`) from "field set to null" (`Some(None)`).
-fn double_option<'de, D, T>(deserializer: D) -> Result<Option<Option<T>>, D::Error>
+pub(crate) fn double_option<'de, D, T>(deserializer: D) -> Result<Option<Option<T>>, D::Error>
 where
     D: serde::Deserializer<'de>,
     T: Deserialize<'de>,

@@ -11,7 +11,7 @@ validateurs, connexion Microsoft 365…).
 | Les clés des portefeuilles | elles permettent de dépenser les EPC d'un utilisateur |
 | La clé maître | elle déchiffre toutes les clés des portefeuilles |
 | Les clés de la chaîne | administration (nommer des encadrants), trésorerie (rembourser), validateur (produire les blocs) |
-| Les données personnelles | nom, prénom, email, cohorte, historique d'achats |
+| Les données personnelles | nom, prénom, email, cohorte, historique d'achats, explications envoyées pour les défis |
 | Les comptes | sessions, mots de passe |
 
 ## Qui pourrait attaquer
@@ -25,7 +25,7 @@ validateurs, connexion Microsoft 365…).
 
 | Menace | Parade |
 |---|---|
-| Créer des EPC sans y être autorisé | La machine d'état n'accepte un `Mint` que signé par une autorité active, dans la limite de son quota de la période ; l'API ne l'expose qu'au rôle encadrant. Vérifié jusqu'au niveau de la chaîne (une transaction forgée avec la clé d'un étudiant est refusée). |
+| Créer des EPC sans y être autorisé | La machine d'état n'accepte un `Mint` que signé par une autorité active, dans la limite de son quota de la période ; l'API ne l'expose qu'aux encadrants et aux administrateurs, directement ou par les défis qu'ils créent (le gain est signé par le créateur, sur son quota). Vérifié jusqu'au niveau de la chaîne (une transaction forgée avec la clé d'un étudiant est refusée). |
 | Dépenser deux fois, rejouer une transaction | Nonce par compte, signature liée à l'identifiant de la chaîne. Côté API, chaque transaction est enregistrée avant envoi et renvoyée à l'identique : un nouvel essai ne peut pas s'appliquer deux fois. Clés d'idempotence sur les paiements et les distributions. |
 | Altérer l'historique | Blocs chaînés par hash, signés par le validateur, racine de Merkle des transactions, racine de l'état. `epicoin-cli verify` et les réplicas rejouent tout depuis la genèse ; toute modification est détectée (testé, y compris sur une chaîne de 10 000 transactions). |
 | Encadrant abusif | Quota par période inscrit sur la chaîne ; journal d'audit ; statistiques par encadrant ; révocation immédiate. |
@@ -35,6 +35,8 @@ validateurs, connexion Microsoft 365…).
 | Fuite de la base ou d'une sauvegarde de données | Clés des portefeuilles chiffrées (XChaCha20-Poly1305) avec une clé maître qui n'est jamais en base ; sessions et jetons stockés hashés ; mots de passe en Argon2id. Les sauvegardes de clés sont séparées des sauvegardes de données. |
 | Copier la clé chiffrée d'un riche sur son propre compte (accès en écriture à la base) | Chaque clé chiffrée est liée à l'identifiant de son propriétaire : déplacée, elle ne se déchiffre plus. |
 | Fuite de secrets dans les journaux ou les réponses | Les types secrets n'ont ni sérialisation ni affichage lisible ; un test parcourt toute l'API et vérifie qu'aucune clé, aucun mot de passe ni aucun jeton n'apparaît dans une réponse ou un journal. |
+| Deviner la réponse d'un défi | Réponse stockée en Argon2id et jamais renvoyée par l'API ; 5 essais par étudiant et par défi toutes les 15 minutes. |
+| Se faire payer deux fois un défi | Le gagnant et sa transaction de versement sont écrits ensemble, sous verrou : une seconde tentative, même simultanée, est refusée (testé). |
 | Fichier malveillant envoyé comme image de produit | Format reconnu par le contenu (PNG, JPEG, WebP), nom choisi par le serveur, taille limitée, `nosniff`. |
 | Données personnelles exposées par la chaîne | Aucune donnée personnelle ni texte libre sur la chaîne (vérifié par des tests qui inspectent les blocs) ; la référence de commande est un hash opaque. Effacement d'un utilisateur possible dans la base. |
 

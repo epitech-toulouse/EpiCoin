@@ -183,8 +183,8 @@ le rôle d'un compte existant.
 - Pour retirer le droit de distribuer : changez le rôle, ou désactivez le compte. La révocation
   est inscrite sur la chaîne.
 
-Un **administrateur distribue aussi**, depuis les menus **Distribuer** et **Mes
-distributions**, avec les mêmes règles qu'un encadrant : autorité sur la chaîne, quota par
+Un **administrateur distribue aussi**, depuis les menus **Distribuer**, **Mes
+distributions** et **Défis** (il y voit et modifie les défis de tous les encadrants), avec les mêmes règles qu'un encadrant : autorité sur la chaîne, quota par
 défaut ou personnel (champ quota de sa fiche), traçabilité dans l'audit. Le premier
 administrateur, créé en ligne de commande, reçoit son autorité au démarrage de l'API ou à la
 synchronisation suivante (5 minutes au plus). La gestion de la boutique lui est aussi ouverte.

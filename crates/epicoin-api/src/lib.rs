@@ -4,8 +4,9 @@
 //! - [`users`]: accounts, CSV import, administration of roles and quotas.
 //! - [`wallets`] / [`vault`]: custodial keys, encrypted at rest.
 //! - [`chain`]: reliable submission of signed transactions to the node.
-//! - [`authority`]: keeps on-chain mint authorities in line with the `staff` role.
-//! - [`mint`]: staff distributions.
+//! - [`authority`]: keeps on-chain mint authorities in line with the distributing roles.
+//! - [`mint`]: distributions by staff and admins.
+//! - [`challenges`]: challenges whose winners are paid at once.
 //! - [`me`]: balance and history of the logged-in user.
 //! - [`shop`]: products, orders paid on chain, refunds.
 //! - [`admin`]: audit trail, statistics, blockchain explorer.
@@ -15,6 +16,7 @@ pub mod audit;
 pub mod auth;
 pub mod authority;
 pub mod chain;
+pub mod challenges;
 pub mod config;
 pub mod demo;
 pub mod error;
@@ -54,6 +56,7 @@ pub fn router(state: AppState) -> Router {
         .nest("/admin", users::admin_router().merge(admin::admin_router()))
         .nest("/explorer", admin::explorer_router())
         .nest("/shop", shop::router())
+        .merge(challenges::router())
         .fallback(|| async { ApiError::not_found("Ressource") });
     Router::new()
         .nest("/api", api)

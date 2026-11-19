@@ -232,13 +232,13 @@ fn decoy_hash() -> &'static str {
 }
 
 /// Argon2 is deliberately slow: keep it off the async worker threads.
-async fn verify_blocking(password: String, phc: String) -> bool {
+pub(crate) async fn verify_blocking(password: String, phc: String) -> bool {
     tokio::task::spawn_blocking(move || verify_password(&password, &phc))
         .await
         .unwrap_or(false)
 }
 
-async fn hash_blocking(password: String) -> ApiResult<String> {
+pub(crate) async fn hash_blocking(password: String) -> ApiResult<String> {
     tokio::task::spawn_blocking(move || hash_password(&password))
         .await
         .map_err(ApiError::internal)?

@@ -43,6 +43,32 @@ administrateur.
 Menu **Mes distributions** : tout ce que vous avez distribué, avec l'étudiant, le motif, le
 montant et l'état (**Confirmée**, **En cours**, **Refusée**).
 
+## Proposer un défi
+
+Menu **Défis** → **Nouveau défi**. Les étudiants qui le réussissent reçoivent les EPC tout de
+suite, sans distribution à faire.
+
+- **Titre et description** : ce qu'il faut faire. Les étudiants les lisent tels quels.
+- **Gain par étudiant**, en EPC. Il est prélevé sur **votre quota** au moment où chaque
+  étudiant réussit (motif « Défi »). Si votre quota est épuisé, l'étudiant est prié de
+  réessayer plus tard : il n'est pas payé, et n'est pas compté comme gagnant.
+- **Validation**, au choix :
+  - **Réponse à trouver** : énigme, quiz, code donné en fin d'atelier, flag… L'étudiant saisit
+    la réponse ; si elle est juste, il est payé aussitôt. Majuscules et espaces ne comptent
+    pas. La réponse n'est plus jamais affichée, même à vous ; vous pouvez la remplacer en
+    modifiant le défi. Chaque étudiant a 5 essais toutes les 15 minutes : évitez les réponses
+    trop faciles à deviner (un chiffre, oui/non).
+  - **Validé par un encadrant** : l'étudiant explique comment il a réussi (un lien, quelques
+    lignes). Dans **Participants**, vous validez (il est payé aussitôt) ou refusez avec un
+    motif ; il peut alors renvoyer sa participation.
+- **Cohortes** (facultatif) : le défi n'est proposé qu'à ces cohortes. Aucune case cochée :
+  tous les étudiants.
+- **Gagnants maximum** et **date limite** (facultatifs). Vous pouvez aussi clore le défi à la
+  main en le modifiant (**Défi terminé**).
+
+Chaque étudiant ne gagne un défi qu'une fois, même s'il clique deux fois. Les administrateurs
+voient et peuvent modifier tous les défis.
+
 ## Bon à savoir
 
 - Une distribution confirmée est **définitive** : la blockchain ne permet pas de l'annuler. En cas

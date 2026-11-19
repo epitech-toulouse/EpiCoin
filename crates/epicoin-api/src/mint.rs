@@ -189,7 +189,7 @@ pub struct QuotaView {
     pub period_ends_at: Option<String>,
 }
 
-async fn quota_of(state: &AppState, address: &Address) -> ApiResult<QuotaView> {
+pub(crate) async fn quota_of(state: &AppState, address: &Address) -> ApiResult<QuotaView> {
     let authority = state.node.account(address).await?.authority;
     Ok(match authority {
         Some(a) if a.active => QuotaView {
@@ -241,7 +241,7 @@ fn too_many_recipients() -> ApiError {
     )
 }
 
-fn reason_name(reason: ReasonCode) -> String {
+pub(crate) fn reason_name(reason: ReasonCode) -> String {
     serde_json::to_value(reason)
         .ok()
         .and_then(|v| v.as_str().map(str::to_owned))

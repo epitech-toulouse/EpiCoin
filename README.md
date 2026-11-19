@@ -57,7 +57,7 @@ la sauvegarde des clés générées, puis la création du premier administrateur
 | Document | Pour qui |
 |---|---|
 | [Guide d'administration](docs/guide-admin.md) | installation, genèse, import des étudiants, encadrants, sauvegardes, rotation des clés |
-| [Guide de l'encadrant](docs/guide-encadrant.md) | distribuer des EPC |
+| [Guide de l'encadrant](docs/guide-encadrant.md) | distribuer des EPC, proposer des défis |
 | [Modèle de menace](docs/modele-de-menace.md) | ce qui est protégé, contre quoi, et les risques acceptés |
 | [Décisions techniques](docs/DECISIONS.md) | les choix qui ne vont pas de soi, et pourquoi |
 | [CLAUDE.md](CLAUDE.md) | architecture et conventions, pour qui modifie le code |

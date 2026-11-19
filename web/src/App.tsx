@@ -15,6 +15,8 @@ import { ManageOrdersPage } from './pages/shop/ManageOrdersPage';
 import { ManageProductsPage } from './pages/shop/ManageProductsPage';
 import { DistributePage } from './pages/staff/DistributePage';
 import { DistributionsPage } from './pages/staff/DistributionsPage';
+import { ManageChallengesPage } from './pages/staff/ManageChallengesPage';
+import { ChallengesPage } from './pages/student/ChallengesPage';
 import { CartPage } from './pages/student/CartPage';
 import { HomePage } from './pages/student/HomePage';
 import { OrdersPage } from './pages/student/OrdersPage';
@@ -61,9 +63,11 @@ export function App() {
         <Route path="/boutique" element={<Protected roles={['student']}><ShopPage /></Protected>} />
         <Route path="/panier" element={<Protected roles={['student']}><CartPage /></Protected>} />
         <Route path="/commandes" element={<Protected roles={['student']}><OrdersPage /></Protected>} />
+        <Route path="/defis" element={<Protected roles={['student']}><ChallengesPage /></Protected>} />
 
         <Route path="/distribuer" element={<Protected roles={DISTRIBUTORS}><DistributePage /></Protected>} />
         <Route path="/distributions" element={<Protected roles={DISTRIBUTORS}><DistributionsPage /></Protected>} />
+        <Route path="/gestion/defis" element={<Protected roles={DISTRIBUTORS}><ManageChallengesPage /></Protected>} />
 
         <Route path="/gestion/commandes" element={<Protected roles={MANAGERS}><ManageOrdersPage /></Protected>} />
         <Route path="/gestion/produits" element={<Protected roles={MANAGERS}><ManageProductsPage /></Protected>} />

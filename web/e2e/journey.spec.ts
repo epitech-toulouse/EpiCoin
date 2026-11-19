@@ -343,6 +343,30 @@ test('a session ended elsewhere sends the user back to the login screen', async 
   await expect(student.getByTestId('balance')).toHaveText(/^35\s*EPC$/);
 });
 
+test('a staff member posts a challenge and a student wins it', async () => {
+  await staff.getByRole('link', { name: 'Défis' }).click();
+  await staff.getByRole('button', { name: 'Nouveau défi' }).click();
+  await staff.getByLabel('Titre').fill('Énigme du campus');
+  await staff.getByLabel('Description').fill('Quel langage fait tourner EpiCoin ?');
+  await staff.getByLabel('Gain par étudiant (EPC)').fill('5');
+  await staff.getByLabel('Réponse attendue').fill('Rust');
+  await staff.getByRole('button', { name: 'Créer le défi' }).click();
+  await expect(staff.getByRole('cell', { name: /^Énigme du campus/ })).toBeVisible();
+
+  await student.getByRole('link', { name: 'Défis' }).click();
+  const card = student.getByRole('article', { name: 'Énigme du campus' });
+  await card.getByLabel('Votre réponse').fill('python');
+  await card.getByRole('button', { name: 'Valider' }).click();
+  await expect(card.getByText("Ce n'est pas la bonne réponse.")).toBeVisible();
+  await card.getByLabel('Votre réponse').fill('  RUST ');
+  await card.getByRole('button', { name: 'Valider' }).click();
+  await expect(card.getByText(/Défi réussi : 5\s*EPC gagnés/)).toBeVisible();
+
+  await student.getByRole('link', { name: 'Mon solde' }).click();
+  await expect(student.getByTestId('balance')).toHaveText(/^40\s*EPC$/);
+  await expect(student.getByText('Défi : Énigme du campus')).toBeVisible();
+});
+
 test('the interface is usable on a phone', async ({ browser }) => {
   const context = await browser.newContext({ viewport: { width: 375, height: 700 } });
   const phone = await context.newPage();

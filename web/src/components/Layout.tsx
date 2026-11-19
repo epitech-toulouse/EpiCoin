@@ -13,6 +13,7 @@ import {
   ShoppingBag,
   ShoppingCart,
   Store,
+  Trophy,
   Users,
   Wallet,
   X,
@@ -45,6 +46,7 @@ const DISTRIBUTION: NavSection = {
   items: [
     { to: '/distribuer', label: 'Distribuer', icon: Gift, color: 'text-brand-600' },
     { to: '/distributions', label: 'Mes distributions', icon: History, color: 'text-accent' },
+    { to: '/gestion/defis', label: 'Défis', icon: Trophy, color: 'text-teal' },
   ],
 };
 
@@ -63,6 +65,7 @@ const MENUS: Record<Role, NavSection[]> = {
       items: [
         { to: '/', label: 'Mon solde', icon: Wallet, color: 'text-brand-600', end: true },
         { to: '/commandes', label: 'Mes commandes', icon: ShoppingBag, color: 'text-accent' },
+        { to: '/defis', label: 'Défis', icon: Trophy, color: 'text-ok' },
       ],
     },
     {

@@ -106,6 +106,22 @@ async fn private_keys_never_appear_in_responses_or_logs(db: PgPool) {
         .unwrap()
         .to_owned();
 
+    // A challenge: the reward is signed with Alan's key.
+    let challenge = alan
+        .post(
+            "/api/staff/challenges",
+            json!({ "title": "Énigme", "reward": 200, "mode": "answer", "answer": "42" }),
+        )
+        .await;
+    let challenge_id = challenge.body["id"].as_str().unwrap().to_owned();
+    let won = ada
+        .post(
+            &format!("/api/challenges/{challenge_id}/answer"),
+            json!({ "answer": "42" }),
+        )
+        .await;
+    assert_eq!(won.status, StatusCode::OK, "{:?}", won.body);
+
     for path in [
         "/api/auth/me",
         "/api/me/wallet",
@@ -113,6 +129,8 @@ async fn private_keys_never_appear_in_responses_or_logs(db: PgPool) {
         "/api/staff/quota",
         "/api/staff/distributions",
         "/api/staff/students",
+        "/api/staff/challenges",
+        "/api/challenges",
     ] {
         ada.get(path).await;
         alan.get(path).await;

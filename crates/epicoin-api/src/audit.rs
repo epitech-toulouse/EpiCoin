@@ -21,6 +21,10 @@ pub mod action {
     pub const AUTHORITY_GRANTED: &str = "authority.granted";
     pub const AUTHORITY_REVOKED: &str = "authority.revoked";
     pub const MINT: &str = "mint.distributed";
+    pub const CHALLENGE_CREATED: &str = "challenges.created";
+    pub const CHALLENGE_UPDATED: &str = "challenges.updated";
+    pub const CHALLENGE_REWARDED: &str = "challenges.rewarded";
+    pub const CHALLENGE_SUBMISSION_REJECTED: &str = "challenges.submission_rejected";
     pub const PRODUCT_CREATED: &str = "shop.product_created";
     pub const PRODUCT_UPDATED: &str = "shop.product_updated";
     pub const PRODUCT_DELETED: &str = "shop.product_deleted";
