@@ -202,7 +202,8 @@ impl TestApp {
             email: format!("{}{n}@epitech.eu", role.as_str().replace('_', "")),
             first_name: format!("Prenom{n}"),
             last_name: format!("Nom{n}"),
-            promo: "2027".into(),
+            // Only students belong to a cohort.
+            promo: if role == Role::Student { "pge1" } else { "" }.into(),
             role,
         };
         let mut conn = self.db.acquire().await.unwrap();

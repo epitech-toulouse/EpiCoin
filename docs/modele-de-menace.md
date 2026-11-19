@@ -11,7 +11,7 @@ validateurs, connexion Microsoft 365…).
 | Les clés des portefeuilles | elles permettent de dépenser les EPC d'un utilisateur |
 | La clé maître | elle déchiffre toutes les clés des portefeuilles |
 | Les clés de la chaîne | administration (nommer des encadrants), trésorerie (rembourser), validateur (produire les blocs) |
-| Les données personnelles | nom, prénom, email, promo, historique d'achats |
+| Les données personnelles | nom, prénom, email, cohorte, historique d'achats |
 | Les comptes | sessions, mots de passe |
 
 ## Qui pourrait attaquer

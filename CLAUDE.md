@@ -68,6 +68,8 @@ boutique, audit).
   temps (SQL : commande + stock + transaction signée ; soumission ; règlement dans
   `orders::settle`, appelé par `ChainService::finalize`). Lire l'en-tête de `orders.rs` avant
   d'y toucher.
+- Cohortes des étudiants : liste fermée `models::COHORTS` (code dans `users.promo`), seule
+  source de la liste, y compris pour le front.
 - `users.rs`, `mint.rs`, `me.rs`, `admin.rs` : endpoints par rôle. Erreurs en JSON
   `{error, message}` : `error` est un code stable, `message` un texte français pour l'interface.
 - Migrations SQL dans `crates/epicoin-api/migrations/`, appliquées au démarrage.

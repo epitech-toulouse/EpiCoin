@@ -14,8 +14,10 @@ utilisez « Mot de passe oublié » sur la page de connexion pour en recevoir un
 Menu **Distribuer**.
 
 1. **Choisissez les étudiants.**
-   - Cherchez par nom, prénom ou email, filtrez par promo, et cochez.
-   - **Tout sélectionner** coche tous les étudiants affichés : pratique avec le filtre de promo.
+   - Cherchez par nom, prénom ou email, filtrez par cohorte (PGE 1, MSc 2027, Bachelor 2…), et
+     cochez.
+   - **Tout sélectionner** coche tous les étudiants affichés : pratique avec le filtre de
+     cohorte.
    - **Importer un fichier CSV** sélectionne d'un coup les étudiants d'une liste : n'importe quel
      fichier contenant des adresses email convient (export d'un tableur, liste d'appel…). Les
      adresses inconnues sont signalées.

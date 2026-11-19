@@ -7,7 +7,7 @@ use std::time::Duration;
 use axum::http::{Method, StatusCode};
 use common::*;
 use epicoin_api::chain::{ChainError, TxMeta};
-use epicoin_api::models::Role;
+use epicoin_api::models::{Role, COHORTS};
 use epicoin_core::{ReasonCode, Transaction, TxError, TxPayload};
 use serde_json::{json, Value};
 use sqlx::PgPool;
@@ -435,8 +435,8 @@ async fn staff_can_search_students(db: PgPool) {
         .post(
             "/api/admin/users/import",
             json!({ "csv": "email,prenom,nom,promo,role\n\
-                            ada@epitech.eu,Ada,Lovelace,2027,student\n\
-                            grace@epitech.eu,Grace,Hopper,2026,student\n\
+                            ada@epitech.eu,Ada,Lovelace,pge1,student\n\
+                            grace@epitech.eu,Grace,Hopper,pge2,student\n\
                             alan@epitech.eu,Alan,Turing,,staff\n" }),
         )
         .await;
@@ -452,17 +452,19 @@ async fn staff_can_search_students(db: PgPool) {
         1
     );
     assert_eq!(
-        staff.get("/api/staff/students?promo=2026").await.body["total"],
+        staff.get("/api/staff/students?promo=pge2").await.body["total"],
         1
     );
     assert_eq!(
         staff.get("/api/staff/students?q=turing").await.body["total"],
         0
     );
-    assert_eq!(
-        staff.get("/api/staff/promos").await.body,
-        json!(["2026", "2027"])
-    );
+    let cohorts = staff.get("/api/staff/promos").await.body;
+    let cohorts = cohorts.as_array().unwrap();
+    assert_eq!(cohorts.len(), COHORTS.len(), "every cohort, even empty");
+    assert_eq!(cohorts[0], json!({ "code": "msc2027", "students": 0 }));
+    assert_eq!(cohorts[3], json!({ "code": "pge1", "students": 1 }));
+    assert_eq!(cohorts[4], json!({ "code": "pge2", "students": 1 }));
 
     // Emails from a CSV chosen in the browser.
     let resolved = staff

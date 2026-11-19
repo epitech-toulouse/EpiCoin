@@ -66,6 +66,12 @@ export interface Student {
   activated: boolean;
 }
 
+export interface Cohort {
+  code: string;
+  /** Active students in the cohort. */
+  students: number;
+}
+
 export interface Quota {
   active: boolean;
   quota: number;

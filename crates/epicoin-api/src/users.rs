@@ -15,7 +15,7 @@ use uuid::Uuid;
 use crate::auth::{send_invitation, CurrentUser};
 use crate::config::Settings;
 use crate::error::{ApiError, ApiResult};
-use crate::models::{Page, Role, User, UserView};
+use crate::models::{parse_cohort, Page, Role, User, UserView, COHORTS, NO_COHORT};
 use crate::state::AppState;
 use crate::vault::Vault;
 use crate::{audit, authority, wallets};
@@ -45,10 +45,33 @@ pub struct NewUser {
 
 /// Normalizes and validates a user to create. The error is a message for the admin.
 pub fn validate(new: &NewUser, settings: &Settings) -> Result<NewUser, String> {
+    let user = normalize(new, settings)?;
+    if user.first_name.is_empty() || user.last_name.is_empty() {
+        return Err("le prénom et le nom sont obligatoires".into());
+    }
+    Ok(user)
+}
+
+/// Turns a typed cohort into its code from [`COHORTS`]; empty means no cohort.
+pub fn normalize_promo(text: &str) -> Result<&'static str, String> {
+    if text.trim().is_empty() {
+        return Ok("");
+    }
+    parse_cohort(text).ok_or_else(|| {
+        format!(
+            "cohorte inconnue « {} » ({})",
+            text.trim(),
+            COHORTS.join(", ")
+        )
+    })
+}
+
+/// Everything [`validate`] checks except the presence of the names, which an import line
+/// that only updates an existing account's cohort does not need.
+fn normalize(new: &NewUser, settings: &Settings) -> Result<NewUser, String> {
     let email = new.email.trim().to_lowercase();
     let first_name = new.first_name.trim().to_owned();
     let last_name = new.last_name.trim().to_owned();
-    let promo = new.promo.trim().to_owned();
 
     let (local, domain) = email
         .split_once('@')
@@ -66,15 +89,13 @@ pub fn validate(new: &NewUser, settings: &Settings) -> Result<NewUser, String> {
             settings.allowed_email_domain
         ));
     }
-    if first_name.is_empty() || last_name.is_empty() {
-        return Err("le prénom et le nom sont obligatoires".into());
-    }
-    if [&first_name, &last_name, &promo]
+    if [&first_name, &last_name]
         .iter()
         .any(|field| field.chars().count() > MAX_FIELD_LEN)
     {
         return Err(format!("un champ dépasse {MAX_FIELD_LEN} caractères"));
     }
+    let promo = normalize_promo(&new.promo)?.to_owned();
     Ok(NewUser {
         email,
         first_name,
@@ -121,17 +142,34 @@ fn header_field(name: &str) -> Option<&'static str> {
         "email" | "e-mail" | "mail" | "adresse email" => Some("email"),
         "first_name" | "firstname" | "prenom" | "prénom" => Some("first_name"),
         "last_name" | "lastname" | "nom" => Some("last_name"),
-        "promo" | "promotion" => Some("promo"),
+        "cohorte" | "cohort" | "promo" | "promotion" => Some("promo"),
         "role" | "rôle" => Some("role"),
         _ => None,
     }
 }
 
+/// A users file, every line checked on its own.
+#[derive(Debug)]
+pub struct ImportFile {
+    /// Whether the file has the name columns, and so can create accounts. Without them, it
+    /// only sets the cohort of existing accounts.
+    pub creates_accounts: bool,
+    pub lines: Vec<ImportLine>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ImportLine {
+    /// 1-based line in the file.
+    pub line: u64,
+    pub user: NewUser,
+}
+
 /// Parses a users CSV. Columns: `email`, `first_name`/`prenom`, `last_name`/`nom`, and
-/// optionally `promo` and `role` (student by default). Separator `,` or `;`.
+/// optionally `cohorte` (or `promo`) and `role` (student by default); or only `email` and
+/// `cohorte`, to change the cohort of existing accounts. Separator `,` or `;`.
 ///
-/// Returns either every user, validated, or every error — never a partial result.
-pub fn parse_csv(text: &str, settings: &Settings) -> Result<Vec<NewUser>, Vec<CsvError>> {
+/// Returns either every line, validated, or every error — never a partial result.
+pub fn parse_csv(text: &str, settings: &Settings) -> Result<ImportFile, Vec<CsvError>> {
     let file_error = |message: &str| {
         vec![CsvError {
             line: 0,
@@ -161,15 +199,15 @@ pub fn parse_csv(text: &str, settings: &Settings) -> Result<Vec<NewUser>, Vec<Cs
             columns.entry(field).or_insert(index);
         }
     }
-    for required in ["email", "first_name", "last_name"] {
-        if !columns.contains_key(required) {
-            return Err(file_error(
-                "colonnes attendues : email, prenom, nom (et en option promo, role)",
-            ));
-        }
+    let creates_accounts = columns.contains_key("first_name") && columns.contains_key("last_name");
+    if !columns.contains_key("email") || !(creates_accounts || columns.contains_key("promo")) {
+        return Err(file_error(
+            "colonnes attendues : email, prenom, nom (et en option cohorte, role), \
+             ou seulement email et cohorte pour changer la cohorte de comptes existants",
+        ));
     }
 
-    let mut users = Vec::new();
+    let mut lines = Vec::new();
     let mut errors = Vec::new();
     let mut seen = HashSet::new();
     for (index, record) in reader.records().enumerate() {
@@ -193,7 +231,7 @@ pub fn parse_csv(text: &str, settings: &Settings) -> Result<Vec<NewUser>, Vec<Cs
         if record.iter().all(str::is_empty) {
             continue;
         }
-        if users.len() + errors.len() >= MAX_IMPORT_ROWS {
+        if lines.len() + errors.len() >= MAX_IMPORT_ROWS {
             return Err(file_error("fichier trop volumineux (2000 lignes maximum)"));
         }
         let field = |name: &str| {
@@ -224,22 +262,32 @@ pub fn parse_csv(text: &str, settings: &Settings) -> Result<Vec<NewUser>, Vec<Cs
             promo: field("promo").to_owned(),
             role,
         };
-        match validate(&candidate, settings) {
+        let checked = if creates_accounts {
+            validate(&candidate, settings)
+        } else if candidate.promo.is_empty() {
+            Err("cohorte manquante".into())
+        } else {
+            normalize(&candidate, settings)
+        };
+        match checked {
             Ok(user) if !seen.insert(user.email.clone()) => errors.push(CsvError {
                 line,
                 message: format!("email en double dans le fichier : {}", user.email),
             }),
-            Ok(user) => users.push(user),
+            Ok(user) => lines.push(ImportLine { line, user }),
             Err(message) => errors.push(CsvError { line, message }),
         }
     }
     if !errors.is_empty() {
         return Err(errors);
     }
-    if users.is_empty() {
+    if lines.is_empty() {
         return Err(file_error("le fichier ne contient aucun utilisateur"));
     }
-    Ok(users)
+    Ok(ImportFile {
+        creates_accounts,
+        lines,
+    })
 }
 
 #[derive(Deserialize)]
@@ -247,55 +295,95 @@ struct ImportRequest {
     csv: String,
 }
 
-/// Imports users from a CSV. Existing emails are skipped; any invalid line cancels the
-/// whole import. Invitations and on-chain authorities follow in the background.
+fn invalid_csv(errors: &[CsvError]) -> ApiError {
+    ApiError::unprocessable(
+        "invalid_csv",
+        "Le fichier contient des erreurs. Rien n'a été importé.",
+    )
+    .with_details(json!({ "errors": errors }))
+}
+
+/// Imports users from a CSV: creates the missing accounts and sets the cohort of existing
+/// ones (their name and role never change; an empty cohort leaves theirs as is). Any invalid
+/// line cancels the whole import. Invitations and on-chain authorities follow in the
+/// background.
 async fn import(
     State(state): State<AppState>,
     current: CurrentUser,
     Json(body): Json<ImportRequest>,
 ) -> ApiResult<Json<Value>> {
     current.require(&[Role::Admin])?;
-    let candidates = parse_csv(&body.csv, &state.settings).map_err(|errors| {
-        ApiError::unprocessable(
-            "invalid_csv",
-            "Le fichier contient des erreurs. Rien n'a été importé.",
-        )
-        .with_details(json!({ "errors": errors }))
-    })?;
+    let file = parse_csv(&body.csv, &state.settings).map_err(|errors| invalid_csv(&errors))?;
 
     let mut tx = state.db.begin().await?;
-    let emails: Vec<String> = candidates.iter().map(|u| u.email.clone()).collect();
-    let existing: HashSet<String> =
-        sqlx::query_scalar::<_, String>("SELECT email FROM users WHERE email = ANY($1)")
-            .bind(&emails)
-            .fetch_all(&mut *tx)
-            .await?
-            .into_iter()
+    let emails: Vec<&str> = file.lines.iter().map(|l| l.user.email.as_str()).collect();
+    // Email → current cohort.
+    let existing: HashMap<String, String> = sqlx::query_as::<_, (String, String)>(
+        "SELECT email, promo FROM users WHERE email = ANY($1)",
+    )
+    .bind(&emails)
+    .fetch_all(&mut *tx)
+    .await?
+    .into_iter()
+    .collect();
+
+    if !file.creates_accounts {
+        let unknown: Vec<CsvError> = file
+            .lines
+            .iter()
+            .filter(|l| !existing.contains_key(&l.user.email))
+            .map(|l| CsvError {
+                line: l.line,
+                message: format!(
+                    "aucun compte pour {} : ajoutez les colonnes prenom et nom pour le créer",
+                    l.user.email
+                ),
+            })
             .collect();
+        if !unknown.is_empty() {
+            return Err(invalid_csv(&unknown));
+        }
+    }
 
     let mut created = Vec::new();
-    for candidate in candidates.iter().filter(|u| !existing.contains(&u.email)) {
-        created.push(create(&mut tx, &state.vault, candidate).await?);
+    let mut updated = 0;
+    for ImportLine {
+        user: candidate, ..
+    } in &file.lines
+    {
+        match existing.get(&candidate.email) {
+            None => created.push(create(&mut tx, &state.vault, candidate).await?),
+            Some(promo) if !candidate.promo.is_empty() && *promo != candidate.promo => {
+                sqlx::query("UPDATE users SET promo = $2 WHERE email = $1")
+                    .bind(&candidate.email)
+                    .bind(&candidate.promo)
+                    .execute(&mut *tx)
+                    .await?;
+                updated += 1;
+            }
+            Some(_) => {}
+        }
     }
     let mut by_role: HashMap<&str, usize> = HashMap::new();
     for user in &created {
         *by_role.entry(user.role.as_str()).or_default() += 1;
     }
+    let summary = json!({
+        "created": created.len(),
+        "updated": updated,
+        "unchanged": existing.len() - updated,
+        "by_role": by_role,
+    });
     audit::record(
         &mut *tx,
         Some(current.id()),
         audit::action::USERS_IMPORTED,
         None,
-        json!({ "created": created.len(), "skipped_existing": existing.len(), "by_role": by_role }),
+        summary.clone(),
     )
     .await?;
     tx.commit().await?;
 
-    let summary = json!({
-        "created": created.len(),
-        "skipped_existing": existing.len(),
-        "by_role": by_role,
-    });
     // Emails and chain transactions can take a while for a whole promotion: do not make
     // the admin's request wait for them.
     tokio::spawn(async move {
@@ -352,12 +440,15 @@ pub fn like_pattern(term: &str) -> Option<String> {
     Some(format!("%{escaped}%"))
 }
 
-/// The `WHERE` clause shared by the count and the page queries: `$1` role, `$2` pattern.
+/// The `WHERE` clause shared by the count and the page queries: `$1` role, `$2` pattern,
+/// `$3` cohort; `$4` true keeps only the students whose cohort is not one of `$5`.
 macro_rules! user_filter {
     () => {
         "($1::text IS NULL OR u.role = $1) AND ($2::text IS NULL \
          OR u.email ILIKE $2 OR u.first_name ILIKE $2 OR u.last_name ILIKE $2 \
-         OR u.promo ILIKE $2 OR (u.first_name || ' ' || u.last_name) ILIKE $2)"
+         OR u.promo ILIKE $2 OR (u.first_name || ' ' || u.last_name) ILIKE $2) \
+         AND ($3::text IS NULL OR u.promo = $3) \
+         AND (NOT $4 OR (u.role = 'student' AND u.promo <> ALL($5)))"
     };
 }
 
@@ -365,6 +456,7 @@ macro_rules! user_filter {
 struct ListParams {
     q: Option<String>,
     role: Option<Role>,
+    promo: Option<String>,
     // Not `#[serde(flatten)]`: flattened query strings lose their numeric types.
     limit: Option<i64>,
     offset: Option<i64>,
@@ -382,6 +474,9 @@ async fn list_users(
     };
     let pattern = params.q.as_deref().and_then(like_pattern);
     let role = params.role.map(Role::as_str);
+    let promo = params.promo.as_deref().filter(|p| !p.is_empty());
+    let without_cohort = promo == Some(NO_COHORT);
+    let promo = promo.filter(|_| !without_cohort);
 
     let total: i64 = sqlx::query_scalar(concat!(
         "SELECT count(*) FROM users u WHERE ",
@@ -389,15 +484,21 @@ async fn list_users(
     ))
     .bind(role)
     .bind(&pattern)
+    .bind(promo)
+    .bind(without_cohort)
+    .bind(&COHORTS[..])
     .fetch_one(&state.db)
     .await?;
     let rows = sqlx::query_as::<_, UserWithWallet>(concat!(
         "SELECT u.*, w.address FROM users u JOIN wallets w ON w.user_id = u.id WHERE ",
         user_filter!(),
-        " ORDER BY u.last_name, u.first_name, u.email LIMIT $3 OFFSET $4"
+        " ORDER BY u.last_name, u.first_name, u.email LIMIT $6 OFFSET $7"
     ))
     .bind(role)
     .bind(&pattern)
+    .bind(promo)
+    .bind(without_cohort)
+    .bind(&COHORTS[..])
     .bind(page.limit())
     .bind(page.offset())
     .fetch_all(&state.db)
@@ -484,13 +585,14 @@ fn capitalize(message: &str) -> String {
 }
 
 /// Fields an admin can change. An absent field is left untouched; `mint_quota: null`
-/// resets the personal quota to the default.
+/// resets the personal quota to the default, `promo: ""` removes the cohort.
 #[derive(Deserialize)]
 struct UpdateRequest {
     role: Option<Role>,
     #[serde(default, deserialize_with = "double_option")]
     mint_quota: Option<Option<i64>>,
     disabled: Option<bool>,
+    promo: Option<String>,
 }
 
 /// Distinguishes "field absent" (`None`) from "field set to null" (`Some(None)`).
@@ -526,17 +628,24 @@ async fn update_user(
             "Le quota ne peut pas être négatif.",
         ));
     }
+    let promo = match &body.promo {
+        Some(text) => normalize_promo(text)
+            .map_err(|message| ApiError::unprocessable("invalid_promo", capitalize(&message)))?
+            .to_owned(),
+        None => before.promo.clone(),
+    };
 
     let mut tx = state.db.begin().await?;
     let after = sqlx::query_as::<_, User>(
         "UPDATE users SET role = $2, mint_quota = $3, \
-         disabled_at = CASE WHEN $4 THEN COALESCE(disabled_at, now()) ELSE NULL END \
-         WHERE id = $1 RETURNING *",
+         disabled_at = CASE WHEN $4 THEN COALESCE(disabled_at, now()) ELSE NULL END, \
+         promo = $5 WHERE id = $1 RETURNING *",
     )
     .bind(id)
     .bind(role.as_str())
     .bind(mint_quota)
     .bind(disabled)
+    .bind(&promo)
     .fetch_one(&mut *tx)
     .await?;
     if disabled {
@@ -554,6 +663,7 @@ async fn update_user(
             "role": { "from": before.role, "to": after.role },
             "disabled": { "from": before.disabled_at.is_some(), "to": after.disabled_at.is_some() },
             "mint_quota": { "from": before.mint_quota, "to": after.mint_quota },
+            "promo": { "from": before.promo, "to": after.promo },
         }),
     )
     .await?;
@@ -644,9 +754,13 @@ mod tests {
             email: email.into(),
             first_name: "Ada".into(),
             last_name: "Lovelace".into(),
-            promo: "2027".into(),
+            promo: "pge1".into(),
             role: Role::Student,
         }
+    }
+
+    fn users(file: ImportFile) -> Vec<NewUser> {
+        file.lines.into_iter().map(|l| l.user).collect()
     }
 
     #[test]
@@ -676,11 +790,31 @@ mod tests {
     }
 
     #[test]
+    fn validation_stores_the_cohort_code() {
+        let mut user = new_user("ada@epitech.eu");
+        user.promo = " MSc 2028 ".into();
+        assert_eq!(validate(&user, &settings()).unwrap().promo, "msc2028");
+
+        user.promo = "  ".into();
+        assert_eq!(validate(&user, &settings()).unwrap().promo, "");
+
+        user.promo = "2027".into();
+        let error = validate(&user, &settings()).unwrap_err();
+        assert!(
+            error.contains("« 2027 »") && error.contains("bach3"),
+            "{error}"
+        );
+    }
+
+    #[test]
     fn csv_with_english_headers_and_commas() {
         let csv = "email,first_name,last_name,promo,role\n\
-                   ada@epitech.eu,Ada,Lovelace,2027,student\n\
+                   ada@epitech.eu,Ada,Lovelace,pge1,student\n\
                    alan@epitech.eu,Alan,Turing,,staff\n";
-        let users = parse_csv(csv, &settings()).unwrap();
+        let file = parse_csv(csv, &settings()).unwrap();
+        assert!(file.creates_accounts);
+        assert_eq!(file.lines[1].line, 3);
+        let users = users(file);
         assert_eq!(users.len(), 2);
         assert_eq!(users[0], new_user("ada@epitech.eu"));
         assert_eq!(users[1].role, Role::Staff);
@@ -689,14 +823,15 @@ mod tests {
 
     #[test]
     fn csv_with_french_headers_semicolons_bom_and_default_role() {
-        let csv = "\u{feff}Email;Prénom;Nom;Promo\r\n\
-                   Ada@Epitech.eu ; Ada ; Lovelace ; 2027\r\n\
+        let csv = "\u{feff}Email;Prénom;Nom;Cohorte\r\n\
+                   Ada@Epitech.eu ; Ada ; Lovelace ; PGE 1\r\n\
                    \r\n\
-                   grace@epitech.eu;Grace;Hopper;2026\r\n";
-        let users = parse_csv(csv, &settings()).unwrap();
+                   grace@epitech.eu;Grace;Hopper;Bachelor 2\r\n";
+        let users = users(parse_csv(csv, &settings()).unwrap());
         assert_eq!(users.len(), 2);
         assert_eq!(users[0], new_user("ada@epitech.eu"));
         assert_eq!(users[1].role, Role::Student);
+        assert_eq!(users[1].promo, "bach2");
     }
 
     #[test]
@@ -706,8 +841,7 @@ mod tests {
                    b@epitech.eu,B,B,boutique\n\
                    c@epitech.eu,C,C,admin\n\
                    d@epitech.eu,D,D,étudiant\n";
-        let roles: Vec<Role> = parse_csv(csv, &settings())
-            .unwrap()
+        let roles: Vec<Role> = users(parse_csv(csv, &settings()).unwrap())
             .into_iter()
             .map(|u| u.role)
             .collect();
@@ -719,25 +853,52 @@ mod tests {
 
     #[test]
     fn csv_errors_are_all_reported_with_their_line() {
-        let csv = "email,prenom,nom,role\n\
-                   ada@epitech.eu,Ada,Lovelace,student\n\
-                   bob@gmail.com,Bob,Martin,student\n\
-                   eve@epitech.eu,Eve,,student\n\
-                   ada@epitech.eu,Ada,Bis,student\n\
-                   max@epitech.eu,Max,Payne,wizard\n";
+        let csv = "email,prenom,nom,role,cohorte\n\
+                   ada@epitech.eu,Ada,Lovelace,student,pge1\n\
+                   bob@gmail.com,Bob,Martin,student,pge1\n\
+                   eve@epitech.eu,Eve,,student,pge1\n\
+                   ada@epitech.eu,Ada,Bis,student,pge1\n\
+                   max@epitech.eu,Max,Payne,wizard,pge1\n\
+                   zoe@epitech.eu,Zoé,Martin,student,pge4\n";
         let errors = parse_csv(csv, &settings()).unwrap_err();
         assert_eq!(
             errors.iter().map(|e| e.line).collect::<Vec<_>>(),
-            vec![3, 4, 5, 6]
+            vec![3, 4, 5, 6, 7]
         );
         assert!(errors[0].message.contains("@epitech.eu"));
         assert!(errors[2].message.contains("double"));
         assert!(errors[3].message.contains("wizard"));
+        assert!(errors[4].message.contains("pge4"));
+    }
+
+    #[test]
+    fn csv_with_only_emails_and_cohorts_updates_cohorts() {
+        let csv = "email;cohorte\n\
+                   Ada@epitech.eu;PGE 2\n\
+                   grace@epitech.eu;msc2029\n";
+        let file = parse_csv(csv, &settings()).unwrap();
+        assert!(!file.creates_accounts);
+        let users = users(file);
+        assert_eq!(users[0].email, "ada@epitech.eu");
+        assert_eq!(users[0].promo, "pge2");
+        assert_eq!(users[1].promo, "msc2029");
+    }
+
+    #[test]
+    fn csv_with_only_emails_needs_a_cohort_on_every_line() {
+        let csv = "email;cohorte\n\
+                   ada@epitech.eu;pge2\n\
+                   grace@epitech.eu;\n";
+        let errors = parse_csv(csv, &settings()).unwrap_err();
+        assert_eq!(errors.len(), 1);
+        assert_eq!(errors[0].line, 3);
+        assert!(errors[0].message.contains("cohorte manquante"));
     }
 
     #[test]
     fn csv_without_required_columns_or_rows_is_refused() {
         assert!(parse_csv("email,nom\nada@epitech.eu,Lovelace\n", &settings()).is_err());
+        assert!(parse_csv("prenom,nom,cohorte\nAda,Lovelace,pge1\n", &settings()).is_err());
         assert!(parse_csv("email,prenom,nom\n", &settings()).is_err());
         assert!(parse_csv("", &settings()).is_err());
     }

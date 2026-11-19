@@ -81,9 +81,9 @@ test('the administrator imports users, who receive an invitation', async () => {
     .getByLabel('Ou collez son contenu')
     .fill(
       [
-        'email;prenom;nom;promo;role',
-        'ada.lovelace@epitech.eu;Ada;Lovelace;2027;student',
-        'grace.hopper@epitech.eu;Grace;Hopper;2027;student',
+        'email;prenom;nom;cohorte;role',
+        'ada.lovelace@epitech.eu;Ada;Lovelace;pge1;student',
+        'grace.hopper@epitech.eu;Grace;Hopper;PGE 2;student',
         'alan.turing@epitech.eu;Alan;Turing;;staff',
         'linus.torvalds@epitech.eu;Linus;Torvalds;;shop_manager',
       ].join('\n'),
@@ -94,6 +94,23 @@ test('the administrator imports users, who receive an invitation', async () => {
 
   await expect(admin.getByText('ada.lovelace@epitech.eu')).toBeVisible();
   await expect(admin.getByText('Invitation envoyée').first()).toBeVisible();
+});
+
+test('the administrator filters by cohort and moves a student with a CSV', async () => {
+  const cohort = admin.getByLabel('Cohorte');
+  await cohort.selectOption({ label: 'PGE 1 (1)' });
+  await expect(admin.getByText('ada.lovelace@epitech.eu')).toBeVisible();
+  await expect(admin.getByText('grace.hopper@epitech.eu')).toBeHidden();
+
+  await admin.getByRole('button', { name: 'Importer un CSV' }).click();
+  await admin
+    .getByLabel('Ou collez son contenu')
+    .fill('email;cohorte\ngrace.hopper@epitech.eu;pge1');
+  await admin.getByRole('button', { name: 'Importer', exact: true }).click();
+  await expect(admin.getByText(/1 changement\(s\) de cohorte/)).toBeVisible();
+  await admin.getByRole('button', { name: 'Terminé' }).click();
+  await expect(admin.getByText('grace.hopper@epitech.eu')).toBeVisible();
+  await cohort.selectOption('');
 });
 
 test('a file with an invalid line is refused entirely', async () => {
@@ -274,7 +291,7 @@ test('the administrator follows everything: statistics, chain and audit', async 
   await expect(admin.getByText('Racine de l\'état')).toBeVisible();
 
   await admin.getByRole('link', { name: 'Audit' }).click();
-  await expect(admin.getByRole('cell', { name: 'Import d’utilisateurs' })).toBeVisible();
+  await expect(admin.getByRole('cell', { name: 'Import d’utilisateurs' }).first()).toBeVisible();
   await expect(admin.getByRole('cell', { name: 'Distribution d’EPC' }).first()).toBeVisible();
   await expect(admin.getByRole('cell', { name: 'Commande remboursée' })).toBeVisible();
 });

@@ -41,7 +41,7 @@ async fn private_keys_never_appear_in_responses_or_logs(db: PgPool) {
         .post(
             "/api/admin/users/import",
             json!({ "csv": "email,prenom,nom,promo,role\n\
-                            ada@epitech.eu,Ada,Lovelace,2027,student\n\
+                            ada@epitech.eu,Ada,Lovelace,pge1,student\n\
                             alan@epitech.eu,Alan,Turing,,staff\n" }),
         )
         .await;

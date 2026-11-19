@@ -22,7 +22,7 @@ import {
   Th,
 } from '../../components/ui';
 import { api, query } from '../../lib/api';
-import { formatDateTime, formatEpc, reasonLabel } from '../../lib/format';
+import { cohortLabel, formatDateTime, formatEpc, reasonLabel } from '../../lib/format';
 import type { HistoryLine, Order, Paged, Wallet as WalletView } from '../../lib/types';
 
 const PAGE = 20;
@@ -70,7 +70,7 @@ export function HomePage() {
     <>
       <PageHeader
         title={`Bonjour ${user?.first_name ?? ''}`}
-        meta={user?.promo ? <Badge>Promo {user.promo}</Badge> : undefined}
+        meta={user?.promo ? <Badge>{cohortLabel(user.promo)}</Badge> : undefined}
       />
 
       <section className="mb-10">

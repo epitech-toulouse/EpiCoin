@@ -13,14 +13,13 @@ use serde_json::json;
 use uuid::Uuid;
 
 use crate::chain::TxMeta;
-use crate::models::{Role, User};
+use crate::models::{Role, User, COHORTS};
 use crate::state::AppState;
 use crate::users::{self, NewUser};
 use crate::{audit, secrets, wallets};
 
 pub const STUDENTS: usize = 150;
 pub const STAFF: usize = 5;
-const PROMOS: [&str; 3] = ["2026", "2027", "2028"];
 const WAIT: Duration = Duration::from_secs(60);
 
 const FIRST_NAMES: [&str; 30] = [
@@ -208,7 +207,13 @@ pub fn people(domain: &str) -> Vec<NewUser> {
         let first = FIRST_NAMES[i % 30];
         let last = LAST_NAMES[(i / 30 + i * 7) % 30];
         let email = unique_email(first, last);
-        people.push(person(email, first, last, PROMOS[i % 3], Role::Student));
+        people.push(person(
+            email,
+            first,
+            last,
+            COHORTS[i % COHORTS.len()],
+            Role::Student,
+        ));
     }
     people
 }

@@ -22,6 +22,7 @@ import {
 import { api, ApiError, query } from '../../lib/api';
 import { extractEmails } from '../../lib/csv';
 import {
+  cohortLabel,
   formatDate,
   formatEpc,
   fullName,
@@ -29,7 +30,7 @@ import {
   REASON_CODES,
   REASON_LABELS,
 } from '../../lib/format';
-import type { Distribution, Paged, Quota, ReasonCode, Student } from '../../lib/types';
+import type { Cohort, Distribution, Paged, Quota, ReasonCode, Student } from '../../lib/types';
 
 const MAX_COMMENT = 280;
 
@@ -47,9 +48,9 @@ export function DistributePage() {
   const fileInput = useRef<HTMLInputElement>(null);
 
   const quota = useQuery({ queryKey: ['quota'], queryFn: () => api<Quota>('/api/staff/quota') });
-  const promos = useQuery({
+  const cohorts = useQuery({
     queryKey: ['promos'],
-    queryFn: () => api<string[]>('/api/staff/promos'),
+    queryFn: () => api<Cohort[]>('/api/staff/promos'),
     staleTime: 300_000,
   });
   const students = useQuery({
@@ -214,7 +215,7 @@ export function DistributePage() {
       <form onSubmit={submit} className="grid gap-6 lg:grid-cols-[1fr_22rem]">
         <Card>
           <CardTitle icon={Users}>1 · Choisir les étudiants</CardTitle>
-          <div className="mb-4 grid gap-3 sm:grid-cols-[1fr_10rem]">
+          <div className="mb-4 grid gap-3 sm:grid-cols-[1fr_13rem]">
             <TextField
               label="Rechercher"
               type="search"
@@ -222,11 +223,11 @@ export function DistributePage() {
               value={search}
               onChange={(event) => setSearch(event.target.value)}
             />
-            <SelectField label="Promo" value={promo} onChange={(event) => setPromo(event.target.value)}>
+            <SelectField label="Cohorte" value={promo} onChange={(event) => setPromo(event.target.value)}>
               <option value="">Toutes</option>
-              {promos.data?.map((value) => (
-                <option key={value} value={value}>
-                  {value}
+              {cohorts.data?.map((cohort) => (
+                <option key={cohort.code} value={cohort.code}>
+                  {cohortLabel(cohort.code)} ({cohort.students})
                 </option>
               ))}
             </SelectField>
@@ -303,7 +304,7 @@ export function DistributePage() {
                       </span>
                       <span className="block truncate text-sm text-slate-600">{student.email}</span>
                     </span>
-                    {student.promo && <Badge tone="neutral">{student.promo}</Badge>}
+                    {student.promo && <Badge tone="neutral">{cohortLabel(student.promo)}</Badge>}
                     {!student.activated && <Badge tone="warning">Compte non activé</Badge>}
                   </label>
                 </li>

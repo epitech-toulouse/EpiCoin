@@ -63,6 +63,15 @@ export function reasonLabel(code: string | null | undefined): string {
   return (code && REASON_LABELS[code as ReasonCode]) || 'Sans motif';
 }
 
+const COHORT_PROGRAMS: Record<string, string> = { msc: 'MSc', pge: 'PGE', bach: 'Bachelor' };
+
+/** `pge1` → "PGE 1", `msc2027` → "MSc 2027"; any other value is shown as is. */
+export function cohortLabel(code: string): string {
+  const [, program, number] = /^([a-z]+)(\d+)$/.exec(code) ?? [];
+  if (!program || !number) return code;
+  return `${COHORT_PROGRAMS[program] ?? program.toUpperCase()} ${number}`;
+}
+
 export const ROLE_LABELS: Record<Role, string> = {
   student: 'Étudiant',
   staff: 'Encadrant',

@@ -21,26 +21,70 @@ import {
 } from '../../components/ui';
 import { useAuth } from '../../auth';
 import { api, ApiError, query } from '../../lib/api';
-import { formatAmount, formatEpc, fullName, parseEpc, ROLE_LABELS } from '../../lib/format';
-import type { AdminUser, Paged, Role } from '../../lib/types';
+import {
+  cohortLabel,
+  formatAmount,
+  formatEpc,
+  fullName,
+  parseEpc,
+  ROLE_LABELS,
+} from '../../lib/format';
+import type { AdminUser, Cohort, Paged, Role } from '../../lib/types';
 
 const PAGE = 50;
 const ROLES = Object.keys(ROLE_LABELS) as Role[];
 
 function useRefreshUsers() {
   const queryClient = useQueryClient();
-  return () => queryClient.invalidateQueries({ queryKey: ['users'] });
+  return () =>
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['users'] }),
+      queryClient.invalidateQueries({ queryKey: ['promos'] }),
+    ]);
+}
+
+/** Every cohort, in display order, with its number of students. */
+function useCohorts() {
+  return useQuery({ queryKey: ['promos'], queryFn: () => api<Cohort[]>('/api/staff/promos') });
+}
+
+/** `value` is kept as an option even if it is not in the list (a value from before). */
+function CohortField({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const cohorts = useCohorts();
+  const codes = cohorts.data?.map((cohort) => cohort.code) ?? [];
+  return (
+    <SelectField label="Cohorte" value={value} onChange={(event) => onChange(event.target.value)}>
+      <option value="">Aucune</option>
+      {codes.map((code) => (
+        <option key={code} value={code}>
+          {cohortLabel(code)}
+        </option>
+      ))}
+      {value !== '' && cohorts.data && !codes.includes(value) && (
+        <option value={value}>{value} (hors liste)</option>
+      )}
+    </SelectField>
+  );
 }
 
 // --- Import ----------------------------------------------------------------------------
 
 interface ImportSummary {
   created: number;
-  skipped_existing: number;
+  /** Existing accounts whose cohort changed. */
+  updated: number;
+  unchanged: number;
 }
 
 function ImportForm({ onDone }: { onDone: () => void }) {
   const refresh = useRefreshUsers();
+  const cohorts = useCohorts();
   const [csv, setCsv] = useState('');
   const run = useMutation({
     mutationFn: () =>
@@ -62,9 +106,9 @@ function ImportForm({ onDone }: { onDone: () => void }) {
       <div className="space-y-4">
         <Alert tone="success">
           {run.data.created} compte(s) créé(s)
-          {run.data.skipped_existing > 0 &&
-            `, ${run.data.skipped_existing} déjà existant(s) ignoré(s)`}
-          . Les invitations partent par email.
+          {run.data.updated > 0 && `, ${run.data.updated} changement(s) de cohorte`}
+          {run.data.unchanged > 0 && `, ${run.data.unchanged} compte(s) existant(s) inchangé(s)`}.
+          {run.data.created > 0 && ' Les invitations partent par email.'}
         </Alert>
         <div className="flex justify-end">
           <Button onClick={onDone}>Terminé</Button>
@@ -75,11 +119,23 @@ function ImportForm({ onDone }: { onDone: () => void }) {
 
   return (
     <form onSubmit={submit} className="space-y-4">
-      <p className="text-sm text-slate-600">
-        Colonnes attendues : <code>email</code>, <code>prenom</code>, <code>nom</code>, et en
-        option <code>promo</code> et <code>role</code> (student, staff, shop_manager, admin ;
-        étudiant par défaut). Séparateur virgule ou point-virgule.
-      </p>
+      <div className="space-y-2 text-sm text-slate-600">
+        <p>
+          Colonnes attendues : <code>email</code>, <code>prenom</code>, <code>nom</code>, et en
+          option <code>cohorte</code> et <code>role</code> (student, staff, shop_manager, admin ;
+          étudiant par défaut). Séparateur virgule ou point-virgule.
+        </p>
+        <p>
+          Un compte déjà inscrit garde son nom et son rôle : seule sa cohorte est mise à jour. Pour
+          changer la cohorte d'étudiants existants, les colonnes <code>email</code> et{' '}
+          <code>cohorte</code> suffisent.
+        </p>
+        {cohorts.data && (
+          <p>
+            Cohortes : {cohorts.data.map((cohort) => cohort.code).join(', ')}.
+          </p>
+        )}
+      </div>
       <TextField
         label="Fichier CSV"
         type="file"
@@ -93,7 +149,7 @@ function ImportForm({ onDone }: { onDone: () => void }) {
         label="Ou collez son contenu"
         rows={6}
         className="font-mono"
-        placeholder={'email;prenom;nom;promo;role\nprenom.nom@epitech.eu;Prénom;Nom;2027;student'}
+        placeholder={'email;prenom;nom;cohorte;role\nprenom.nom@epitech.eu;Prénom;Nom;pge1;student'}
         value={csv}
         onChange={(event) => setCsv(event.target.value)}
       />
@@ -132,7 +188,12 @@ function CreateForm({ onDone }: { onDone: () => void }) {
     role: 'student' as Role,
   });
   const create = useMutation({
-    mutationFn: () => api<AdminUser>('/api/admin/users', { method: 'POST', body: form }),
+    mutationFn: () =>
+      api<AdminUser>('/api/admin/users', {
+        method: 'POST',
+        // Only students belong to a cohort.
+        body: { ...form, promo: form.role === 'student' ? form.promo : '' },
+      }),
     onSuccess: async () => {
       await refresh();
       onDone();
@@ -155,7 +216,6 @@ function CreateForm({ onDone }: { onDone: () => void }) {
         <TextField label="Nom" required value={form.last_name} onChange={set('last_name')} />
       </div>
       <div className="grid grid-cols-2 gap-3">
-        <TextField label="Promo" value={form.promo} onChange={set('promo')} />
         <SelectField label="Rôle" value={form.role} onChange={set('role')}>
           {ROLES.map((role) => (
             <option key={role} value={role}>
@@ -163,6 +223,9 @@ function CreateForm({ onDone }: { onDone: () => void }) {
             </option>
           ))}
         </SelectField>
+        {form.role === 'student' && (
+          <CohortField value={form.promo} onChange={(promo) => setForm({ ...form, promo })} />
+        )}
       </div>
       <p className="text-sm text-slate-600">Une invitation lui sera envoyée par email.</p>
       <div className="flex justify-end gap-2">
@@ -187,6 +250,7 @@ function EditForm({ user, onDone }: { user: AdminUser; onDone: () => void }) {
     user.mint_quota === null ? '' : formatAmount(user.mint_quota),
   );
   const [disabled, setDisabled] = useState(user.disabled);
+  const [promo, setPromo] = useState(user.promo);
   const isSelf = me?.id === user.id;
 
   const quota = quotaText.trim() === '' ? null : parseEpc(quotaText);
@@ -200,7 +264,12 @@ function EditForm({ user, onDone }: { user: AdminUser; onDone: () => void }) {
     mutationFn: () =>
       api<AdminUser>(`/api/admin/users/${user.id}`, {
         method: 'PATCH',
-        body: { role, disabled, mint_quota: role === 'staff' ? quota : null },
+        body: {
+          role,
+          disabled,
+          mint_quota: role === 'staff' ? quota : null,
+          ...(promo !== user.promo && { promo }),
+        },
       }),
     onSuccess: done,
   });
@@ -238,6 +307,9 @@ function EditForm({ user, onDone }: { user: AdminUser; onDone: () => void }) {
           </option>
         ))}
       </SelectField>
+      {(role === 'student' || user.promo !== '') && (
+        <CohortField value={promo} onChange={setPromo} />
+      )}
       {role === 'staff' && (
         <TextField
           label="Quota de distribution par période (EPC)"
@@ -307,13 +379,17 @@ type Dialog = { kind: 'import' } | { kind: 'create' } | { kind: 'edit'; user: Ad
 export function UsersPage() {
   const [search, setSearch] = useState('');
   const [role, setRole] = useState<Role | ''>('');
+  const [promo, setPromo] = useState('');
   const [offset, setOffset] = useState(0);
   const [dialog, setDialog] = useState<Dialog>(null);
+  const cohorts = useCohorts();
 
   const users = useQuery({
-    queryKey: ['users', search, role, offset],
+    queryKey: ['users', search, role, promo, offset],
     queryFn: () =>
-      api<Paged<AdminUser>>(`/api/admin/users${query({ q: search, role, limit: PAGE, offset })}`),
+      api<Paged<AdminUser>>(
+        `/api/admin/users${query({ q: search, role, promo, limit: PAGE, offset })}`,
+      ),
     placeholderData: keepPreviousData,
   });
 
@@ -331,11 +407,11 @@ export function UsersPage() {
         }
       />
 
-      <div className="mb-4 grid gap-3 sm:grid-cols-[1fr_12rem]">
+      <div className="mb-4 grid gap-3 sm:grid-cols-[1fr_12rem_14rem]">
         <TextField
           label="Rechercher"
           type="search"
-          placeholder="Nom, email ou promo"
+          placeholder="Nom ou email"
           value={search}
           onChange={(event) => {
             setSearch(event.target.value);
@@ -357,6 +433,22 @@ export function UsersPage() {
             </option>
           ))}
         </SelectField>
+        <SelectField
+          label="Cohorte"
+          value={promo}
+          onChange={(event) => {
+            setPromo(event.target.value);
+            setOffset(0);
+          }}
+        >
+          <option value="">Toutes</option>
+          {cohorts.data?.map((cohort) => (
+            <option key={cohort.code} value={cohort.code}>
+              {cohortLabel(cohort.code)} ({cohort.students})
+            </option>
+          ))}
+          <option value="none">Étudiants sans cohorte</option>
+        </SelectField>
       </div>
 
       <ErrorAlert error={users.error} />
@@ -371,7 +463,7 @@ export function UsersPage() {
               <thead>
                 <tr>
                   <Th>Nom</Th>
-                  <Th>Promo</Th>
+                  <Th>Cohorte</Th>
                   <Th>Rôle</Th>
                   <Th>État</Th>
                   <Th>
@@ -386,7 +478,7 @@ export function UsersPage() {
                       <span className="font-medium">{fullName(user)}</span>
                       <span className="block text-slate-600">{user.email}</span>
                     </Td>
-                    <Td>{user.promo}</Td>
+                    <Td>{cohortLabel(user.promo)}</Td>
                     <Td>
                       {ROLE_LABELS[user.role]}
                       {user.role === 'staff' && user.mint_quota !== null && (

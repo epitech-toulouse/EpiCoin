@@ -9,8 +9,8 @@ use serde_json::{json, Value};
 use sqlx::PgPool;
 
 const CSV: &str = "email;prenom;nom;promo;role\n\
-                   ada@epitech.eu;Ada;Lovelace;2027;student\n\
-                   grace@epitech.eu;Grace;Hopper;2026;etudiant\n\
+                   ada@epitech.eu;Ada;Lovelace;pge1;student\n\
+                   grace@epitech.eu;Grace;Hopper;MSc 2027;etudiant\n\
                    alan@epitech.eu;Alan;Turing;;encadrant\n\
                    linus@epitech.eu;Linus;Torvalds;;boutique\n";
 
@@ -43,7 +43,8 @@ async fn csv_import_creates_accounts_wallets_and_invitations(db: PgPool) {
         .await;
     assert_eq!(reply.status, StatusCode::OK, "{:?}", reply.body);
     assert_eq!(reply.body["created"], 4);
-    assert_eq!(reply.body["skipped_existing"], 0);
+    assert_eq!(reply.body["updated"], 0);
+    assert_eq!(reply.body["unchanged"], 0);
     assert_eq!(reply.body["by_role"]["student"], 2);
     assert_eq!(reply.body["by_role"]["staff"], 1);
 
@@ -51,7 +52,9 @@ async fn csv_import_creates_accounts_wallets_and_invitations(db: PgPool) {
     assert_eq!(count(&app, "SELECT count(*) FROM wallets").await, 5);
     let ada = find(&mut admin, "ada@epitech.eu").await;
     assert_eq!(ada["first_name"], "Ada");
-    assert_eq!(ada["promo"], "2027");
+    assert_eq!(ada["promo"], "pge1");
+    let grace = find(&mut admin, "grace@epitech.eu").await;
+    assert_eq!(grace["promo"], "msc2027", "stored as its code");
     assert_eq!(ada["role"], "student");
     assert_eq!(ada["activated"], false);
     assert_eq!(ada["wallet_address"].as_str().unwrap().len(), 64);
@@ -82,21 +85,105 @@ async fn csv_import_creates_accounts_wallets_and_invitations(db: PgPool) {
 }
 
 #[sqlx::test(migrator = "epicoin_api::MIGRATOR")]
-async fn import_skips_existing_accounts(db: PgPool) {
+async fn reimporting_a_file_only_creates_the_new_accounts(db: PgPool) {
     let app = TestApp::start(db).await;
     let (mut admin, _) = app.login_as(Role::Admin).await;
     admin
         .post("/api/admin/users/import", json!({ "csv": CSV }))
         .await;
 
-    let more = format!("{CSV}margaret@epitech.eu;Margaret;Hamilton;2027;student\n");
+    let more = format!("{CSV}margaret@epitech.eu;Margaret;Hamilton;pge1;student\n");
     let reply = admin
         .post("/api/admin/users/import", json!({ "csv": more }))
         .await;
     assert_eq!(reply.status, StatusCode::OK);
     assert_eq!(reply.body["created"], 1);
-    assert_eq!(reply.body["skipped_existing"], 4);
+    assert_eq!(reply.body["updated"], 0);
+    assert_eq!(reply.body["unchanged"], 4);
     assert_eq!(count(&app, "SELECT count(*) FROM users").await, 6);
+}
+
+#[sqlx::test(migrator = "epicoin_api::MIGRATOR")]
+async fn import_moves_existing_accounts_to_their_new_cohort_and_nothing_else(db: PgPool) {
+    let app = TestApp::start(db).await;
+    let (mut admin, _) = app.login_as(Role::Admin).await;
+    admin
+        .post("/api/admin/users/import", json!({ "csv": CSV }))
+        .await;
+
+    // Next year: Ada moves up. The file also gives her another name and role, and leaves
+    // Grace's cohort empty.
+    let next_year = "email;prenom;nom;cohorte;role\n\
+                     ada@epitech.eu;Ada;Byron;PGE 2;admin\n\
+                     grace@epitech.eu;Grace;Hopper;;etudiant\n";
+    let reply = admin
+        .post("/api/admin/users/import", json!({ "csv": next_year }))
+        .await;
+    assert_eq!(reply.status, StatusCode::OK, "{:?}", reply.body);
+    assert_eq!(reply.body["created"], 0);
+    assert_eq!(reply.body["updated"], 1);
+    assert_eq!(reply.body["unchanged"], 1);
+
+    let ada = find(&mut admin, "ada@epitech.eu").await;
+    assert_eq!(ada["promo"], "pge2");
+    assert_eq!(
+        ada["last_name"], "Lovelace",
+        "names are not changed by an import"
+    );
+    assert_eq!(ada["role"], "student", "roles are not changed by an import");
+    let grace = find(&mut admin, "grace@epitech.eu").await;
+    assert_eq!(
+        grace["promo"], "msc2027",
+        "an empty cohort leaves the current one"
+    );
+}
+
+#[sqlx::test(migrator = "epicoin_api::MIGRATOR")]
+async fn a_file_of_emails_and_cohorts_reassigns_cohorts(db: PgPool) {
+    let app = TestApp::start(db).await;
+    let (mut admin, _) = app.login_as(Role::Admin).await;
+    admin
+        .post("/api/admin/users/import", json!({ "csv": CSV }))
+        .await;
+
+    let reply = admin
+        .post(
+            "/api/admin/users/import",
+            json!({ "csv": "email,cohorte\nada@epitech.eu,bach1\nGrace@epitech.eu,Bachelor 2\n" }),
+        )
+        .await;
+    assert_eq!(reply.status, StatusCode::OK, "{:?}", reply.body);
+    assert_eq!(reply.body["created"], 0);
+    assert_eq!(reply.body["updated"], 2);
+    assert_eq!(find(&mut admin, "ada@epitech.eu").await["promo"], "bach1");
+    assert_eq!(find(&mut admin, "grace@epitech.eu").await["promo"], "bach2");
+}
+
+#[sqlx::test(migrator = "epicoin_api::MIGRATOR")]
+async fn a_file_of_emails_and_cohorts_cannot_create_accounts(db: PgPool) {
+    let app = TestApp::start(db).await;
+    let (mut admin, _) = app.login_as(Role::Admin).await;
+    admin
+        .post("/api/admin/users/import", json!({ "csv": CSV }))
+        .await;
+
+    let reply = admin
+        .post(
+            "/api/admin/users/import",
+            json!({ "csv": "email;cohorte\nada@epitech.eu;bach1\nghost@epitech.eu;bach1\n" }),
+        )
+        .await;
+    assert_eq!(reply.status, StatusCode::UNPROCESSABLE_ENTITY);
+    assert_eq!(reply.error(), "invalid_csv");
+    let errors = reply.body["details"]["errors"].as_array().unwrap();
+    assert_eq!(errors.len(), 1);
+    assert_eq!(errors[0]["line"], 3);
+    assert!(errors[0]["message"]
+        .as_str()
+        .unwrap()
+        .contains("ghost@epitech.eu"));
+    // All or nothing: Ada keeps her cohort.
+    assert_eq!(find(&mut admin, "ada@epitech.eu").await["promo"], "pge1");
 }
 
 #[sqlx::test(migrator = "epicoin_api::MIGRATOR")]
@@ -181,6 +268,16 @@ async fn single_creation_validates_and_refuses_duplicates(db: PgPool) {
     let duplicate = admin.post("/api/admin/users", user("ada@epitech.eu")).await;
     assert_eq!(duplicate.status, StatusCode::CONFLICT);
     assert_eq!(duplicate.error(), "email_taken");
+
+    let mut unknown_cohort = user("grace@epitech.eu");
+    unknown_cohort["promo"] = json!("2027");
+    let reply = admin.post("/api/admin/users", unknown_cohort).await;
+    assert_eq!(reply.status, StatusCode::UNPROCESSABLE_ENTITY);
+    assert_eq!(reply.error(), "invalid_user");
+    assert!(reply.body["message"]
+        .as_str()
+        .unwrap()
+        .contains("Cohorte inconnue"));
 }
 
 // --- Listing ---------------------------------------------------------------------------
@@ -213,6 +310,67 @@ async fn users_can_be_searched_filtered_and_paged(db: PgPool) {
     let page = admin.get("/api/admin/users?limit=2&offset=4").await;
     assert_eq!(page.body["total"], 5);
     assert_eq!(page.body["items"].as_array().unwrap().len(), 1);
+}
+
+#[sqlx::test(migrator = "epicoin_api::MIGRATOR")]
+async fn users_can_be_filtered_by_cohort(db: PgPool) {
+    let app = TestApp::start(db).await;
+    let (mut admin, _) = app.login_as(Role::Admin).await;
+    let csv = format!("{CSV}eve@epitech.eu;Eve;Nobody;;student\nmax@epitech.eu;Max;Old;;student\n");
+    admin
+        .post("/api/admin/users/import", json!({ "csv": csv }))
+        .await;
+    // A free-text value from before cohorts were a fixed list.
+    sqlx::query("UPDATE users SET promo = '2026' WHERE email = 'max@epitech.eu'")
+        .execute(&app.db)
+        .await
+        .unwrap();
+
+    let emails = |reply: &Reply| -> Vec<String> {
+        reply.body["items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|u| u["email"].as_str().unwrap().to_owned())
+            .collect()
+    };
+    let pge1 = admin.get("/api/admin/users?promo=pge1").await;
+    assert_eq!(emails(&pge1), ["ada@epitech.eu"]);
+    let msc = admin.get("/api/admin/users?promo=msc2027&q=grace").await;
+    assert_eq!(emails(&msc), ["grace@epitech.eu"]);
+    assert_eq!(
+        admin.get("/api/admin/users?promo=bach3").await.body["total"],
+        0
+    );
+
+    // Students without a valid cohort; staff and admins never have one.
+    let none = admin.get("/api/admin/users?promo=none").await;
+    assert_eq!(emails(&none), ["eve@epitech.eu", "max@epitech.eu"]);
+    assert_eq!(none.body["total"], 2);
+}
+
+#[sqlx::test(migrator = "epicoin_api::MIGRATOR")]
+async fn admins_change_the_cohort_of_a_user(db: PgPool) {
+    let app = TestApp::start(db).await;
+    let (mut admin, _) = app.login_as(Role::Admin).await;
+    let user = app.seed(Role::Student).await;
+    let path = format!("/api/admin/users/{}", user.id);
+
+    let reply = admin.patch(&path, json!({ "promo": "PGE 3" })).await;
+    assert_eq!(reply.status, StatusCode::OK, "{:?}", reply.body);
+    assert_eq!(reply.body["promo"], "pge3");
+
+    // Another change leaves the cohort alone.
+    let reply = admin.patch(&path, json!({ "disabled": false })).await;
+    assert_eq!(reply.body["promo"], "pge3");
+
+    let unknown = admin.patch(&path, json!({ "promo": "pge9" })).await;
+    assert_eq!(unknown.status, StatusCode::UNPROCESSABLE_ENTITY);
+    assert_eq!(unknown.error(), "invalid_promo");
+    assert_eq!(app.user(user.id).await.unwrap().promo, "pge3");
+
+    let reply = admin.patch(&path, json!({ "promo": "" })).await;
+    assert_eq!(reply.body["promo"], "");
 }
 
 // --- Roles and on-chain authority ------------------------------------------------------

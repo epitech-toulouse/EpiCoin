@@ -128,20 +128,45 @@ Dans **Utilisateurs → Importer un CSV**, envoyez un fichier de ce format (virg
 point-virgule, en-têtes en français ou en anglais) :
 
 ```csv
-email;prenom;nom;promo;role
-ada.lovelace@epitech.eu;Ada;Lovelace;2027;etudiant
+email;prenom;nom;cohorte;role
+ada.lovelace@epitech.eu;Ada;Lovelace;pge1;etudiant
 alan.turing@epitech.eu;Alan;Turing;;encadrant
 ```
 
-- `promo` et `role` sont facultatifs (rôle par défaut : étudiant). Rôles acceptés : `etudiant`
-  (`student`), `encadrant` (`staff`), `boutique` (`shop_manager`), `admin`.
+- `cohorte` (ou `promo`) et `role` sont facultatifs (rôle par défaut : étudiant). Rôles
+  acceptés : `etudiant` (`student`), `encadrant` (`staff`), `boutique` (`shop_manager`),
+  `admin`.
+- Cohortes acceptées : `msc2027`, `msc2028`, `msc2029`, `pge1`, `pge2`, `pge3`, `bach1`,
+  `bach2`, `bach3`. Majuscules, espaces et tirets ne comptent pas : `PGE 1`, `MSc-2027` ou
+  `Bachelor 2` conviennent.
 - Seules les adresses du domaine autorisé (`EPICOIN_ALLOWED_EMAIL_DOMAIN`) sont acceptées.
 - **Tout ou rien** : si une ligne est invalide, rien n'est importé et chaque erreur est listée
-  avec son numéro de ligne. Les adresses déjà inscrites sont simplement ignorées : on peut
+  avec son numéro de ligne.
+- Une adresse déjà inscrite ne crée pas de second compte : seule sa **cohorte** est mise à jour
+  (si la case est remplie). Le nom et le rôle ne changent jamais par un import. On peut donc
   réimporter un fichier complété.
 - Chaque nouveau compte reçoit un email d'invitation. Le lien est valable 7 jours ; s'il a
   expiré, ouvrez l'utilisateur et cliquez sur **Renvoyer l'invitation**. Un utilisateur qui
   utilise « Mot de passe oublié » avant d'avoir activé son compte reçoit aussi une invitation.
+
+### Changer les étudiants de cohorte
+
+À la rentrée, un fichier avec seulement les colonnes `email` et `cohorte` met à jour la cohorte
+d'étudiants déjà inscrits :
+
+```csv
+email;cohorte
+ada.lovelace@epitech.eu;pge2
+grace.hopper@epitech.eu;bach3
+```
+
+Une adresse inconnue est alors une erreur : pour créer le compte, il faut les colonnes `prenom`
+et `nom`. Pour un seul étudiant, ouvrez-le dans la liste et choisissez sa cohorte.
+
+Dans la liste des utilisateurs, le filtre **Cohorte** affiche une cohorte, ou les **étudiants
+sans cohorte** (à qui il reste à en attribuer une). Ajouter une cohorte, par exemple une
+nouvelle année de MSc, demande une ligne de code : la liste `COHORTS` dans
+`crates/epicoin-api/src/models.rs`.
 
 ## 5. Ajouter un encadrant
 
@@ -165,7 +190,7 @@ encadrant. La gestion de la boutique, en revanche, lui est ouverte.
 
 - **Désactiver** un compte : connexion impossible, sessions fermées immédiatement, droit de
   distribuer retiré. Réversible.
-- **Supprimer** un compte (droit à l'effacement) : nom, email, promo, sessions et clé du
+- **Supprimer** un compte (droit à l'effacement) : nom, email, cohorte, sessions et clé du
   portefeuille sont effacés de la base. La chaîne garde l'adresse et ses mouvements, que plus
   rien ne relie à une personne. Les EPC restants deviennent inutilisables. Irréversible.
 - Le **journal d'audit** (menu Audit) trace connexions, imports, changements de rôle et de

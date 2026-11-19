@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { extractEmails } from './csv';
-import { formatAmount, formatEpc, parseEpc, reasonLabel, shortHash } from './format';
+import { cohortLabel, formatAmount, formatEpc, parseEpc, reasonLabel, shortHash } from './format';
 
 describe('formatAmount', () => {
   it('shows whole amounts without decimals', () => {
@@ -73,5 +73,19 @@ describe('extractEmails', () => {
       'ada@epitech.eu',
     ]);
     expect(extractEmails('')).toEqual([]);
+  });
+});
+
+describe('cohortLabel', () => {
+  it('spells out the program and its year', () => {
+    expect(cohortLabel('msc2027')).toBe('MSc 2027');
+    expect(cohortLabel('pge1')).toBe('PGE 1');
+    expect(cohortLabel('bach3')).toBe('Bachelor 3');
+  });
+
+  it('shows any other value as is', () => {
+    expect(cohortLabel('')).toBe('');
+    expect(cohortLabel('2026')).toBe('2026');
+    expect(cohortLabel('abc4')).toBe('ABC 4');
   });
 });

@@ -335,7 +335,7 @@ async fn invite(app: &TestApp, email: &str) -> String {
         .post(
             "/api/admin/users",
             json!({ "email": email, "first_name": "Ada", "last_name": "Lovelace",
-                    "promo": "2027", "role": "student" }),
+                    "promo": "pge1", "role": "student" }),
         )
         .await;
     assert_eq!(reply.status, StatusCode::CREATED, "{:?}", reply.body);

@@ -4,7 +4,7 @@
 //! member's custodial key. The reason code goes on chain; the optional free-text comment
 //! stays in Postgres.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::time::Duration;
 
 use axum::extract::{Query, State};
@@ -20,7 +20,7 @@ use uuid::Uuid;
 use crate::auth::CurrentUser;
 use crate::chain::{ChainError, TxMeta};
 use crate::error::{ApiError, ApiResult};
-use crate::models::{Page, Role};
+use crate::models::{Page, Role, COHORTS};
 use crate::state::AppState;
 use crate::users::like_pattern;
 use crate::{audit, wallets};
@@ -106,18 +106,35 @@ async fn students(
     Ok(Json(json!({ "items": items, "total": total })))
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CohortView {
+    pub code: String,
+    /// Active (not disabled) students in the cohort.
+    pub students: i64,
+}
+
+/// Every cohort, in display order, with its number of students.
 async fn promos(
     State(state): State<AppState>,
     current: CurrentUser,
-) -> ApiResult<Json<Vec<String>>> {
+) -> ApiResult<Json<Vec<CohortView>>> {
     current.require(&[Role::Staff, Role::Admin])?;
-    let promos = sqlx::query_scalar(
-        "SELECT DISTINCT promo FROM users \
-         WHERE role = 'student' AND disabled_at IS NULL AND promo <> '' ORDER BY promo",
+    let counts: HashMap<String, i64> = sqlx::query_as(
+        "SELECT promo, count(*) FROM users \
+         WHERE role = 'student' AND disabled_at IS NULL GROUP BY promo",
     )
     .fetch_all(&state.db)
-    .await?;
-    Ok(Json(promos))
+    .await?
+    .into_iter()
+    .collect();
+    let cohorts = COHORTS
+        .into_iter()
+        .map(|code| CohortView {
+            code: code.to_owned(),
+            students: counts.get(code).copied().unwrap_or(0),
+        })
+        .collect();
+    Ok(Json(cohorts))
 }
 
 #[derive(Deserialize)]

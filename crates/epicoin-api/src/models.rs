@@ -47,6 +47,28 @@ impl TryFrom<String> for Role {
     }
 }
 
+/// Student cohorts, in display order. `users.promo` holds one of these codes, or `''` for
+/// none. A new MSc year is one more line here: nothing else lists them.
+pub const COHORTS: [&str; 9] = [
+    "msc2027", "msc2028", "msc2029", "pge1", "pge2", "pge3", "bach1", "bach2", "bach3",
+];
+
+/// The `promo` filter value that selects students without a cohort from [`COHORTS`].
+pub const NO_COHORT: &str = "none";
+
+/// Recognizes a cohort however it is typed: `PGE 1`, `MSc-2027`, `Bachelor 2`…
+pub fn parse_cohort(text: &str) -> Option<&'static str> {
+    let mut compact: String = text
+        .chars()
+        .filter(|c| !c.is_whitespace() && *c != '-' && *c != '_')
+        .flat_map(char::to_lowercase)
+        .collect();
+    if let Some(rest) = compact.strip_prefix("bachelor") {
+        compact = format!("bach{rest}");
+    }
+    COHORTS.into_iter().find(|code| *code == compact)
+}
+
 /// A `users` row. Contains the password hash: never serialized — see [`UserView`].
 #[derive(Debug, Clone, sqlx::FromRow)]
 pub struct User {
@@ -139,6 +161,21 @@ mod tests {
         assert_eq!(Role::parse("boutique"), Some(Role::ShopManager));
         assert_eq!(Role::parse("superuser"), None);
         assert!(Role::try_from("nope".to_owned()).is_err());
+    }
+
+    #[test]
+    fn cohorts_are_recognized_however_they_are_typed() {
+        for code in COHORTS {
+            assert_eq!(parse_cohort(code), Some(code));
+        }
+        assert_eq!(parse_cohort(" PGE 1 "), Some("pge1"));
+        assert_eq!(parse_cohort("MSc-2027"), Some("msc2027"));
+        assert_eq!(parse_cohort("msc_2029"), Some("msc2029"));
+        assert_eq!(parse_cohort("Bachelor 3"), Some("bach3"));
+        assert_eq!(parse_cohort("BACH2"), Some("bach2"));
+        for unknown in ["", "2027", "pge4", "msc2026", "pge", NO_COHORT] {
+            assert_eq!(parse_cohort(unknown), None, "{unknown}");
+        }
     }
 
     #[test]
