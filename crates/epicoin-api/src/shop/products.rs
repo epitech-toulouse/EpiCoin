@@ -16,7 +16,8 @@ use crate::auth::CurrentUser;
 use crate::error::{ApiError, ApiResult};
 use crate::state::AppState;
 
-pub const MAX_IMAGE_BYTES: usize = 2 * 1024 * 1024;
+/// Room for a photo straight from a phone.
+pub const MAX_IMAGE_BYTES: usize = 15 * 1024 * 1024;
 const MAX_NAME_CHARS: usize = 100;
 const MAX_DESCRIPTION_CHARS: usize = 2_000;
 /// 10 million EPC: far beyond any real price, and safely within `i64`.
@@ -305,7 +306,7 @@ async fn remove_image(state: &AppState, file: &str) {
     }
 }
 
-/// Replaces the image of a product. The body is the raw image (PNG, JPEG or WebP, 2 MB max).
+/// Replaces the image of a product. The body is the raw image (PNG, JPEG or WebP, 15 MB max).
 pub async fn upload_image(
     State(state): State<AppState>,
     current: CurrentUser,
@@ -317,7 +318,7 @@ pub async fn upload_image(
         return Err(ApiError::new(
             StatusCode::PAYLOAD_TOO_LARGE,
             "image_too_large",
-            "L'image ne doit pas dépasser 2 Mo.",
+            "L'image ne doit pas dépasser 15 Mo.",
         ));
     }
     let extension = image_extension(&body).ok_or_else(|| {

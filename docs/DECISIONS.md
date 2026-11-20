@@ -90,7 +90,7 @@ Choix non imposés par la spécification, avec leur raison. À compléter au fil
 | S6 | Un `Purchase` par commande, pour le total du panier ; `order_ref` = hash de l'identifiant de commande. | La chaîne ne révèle ni la commande ni les produits. |
 | S7 | Annulation possible depuis `pending` ou `ready`, jamais après `delivered` ; remboursement intégral ; le stock revient à l'inclusion du `Refund`. | Suit la règle on-chain (un seul remboursement, intégral). |
 | S8 | Les lignes de commande copient le nom et le prix du produit. Un produit déjà commandé ne peut plus être supprimé, seulement désactivé. | L'historique ne change pas quand le catalogue change. |
-| S9 | Images produit : envoi du fichier brut (2 Mo max), format reconnu par ses premiers octets (PNG, JPEG, WebP), nom généré par le serveur, servies sans authentification avec `nosniff`. | Pas de SVG ni de HTML déguisé ; aucun nom de fichier venant du client n'atteint le disque. |
+| S9 | Images produit : envoi du fichier brut (15 Mo max, pour accepter une photo prise au téléphone ; 2 Mo au départ), format reconnu par ses premiers octets (PNG, JPEG, WebP), nom généré par le serveur, servies sans authentification avec `nosniff`. | Pas de SVG ni de HTML déguisé ; aucun nom de fichier venant du client n'atteint le disque. |
 | S10 | Un administrateur peut faire tout ce que fait le gestionnaire de boutique. Seuls les étudiants achètent. | Petite équipe : l'admin dépanne. Les encadrants ne détiennent pas d'EPC. |
 
 ## Défis (`epicoin-api::challenges`)

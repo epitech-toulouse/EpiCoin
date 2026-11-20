@@ -21,7 +21,7 @@ import { formatAmount, formatEpc, parseEpc } from '../../lib/format';
 import type { Product } from '../../lib/types';
 import { ProductImage } from '../student/ShopPage';
 
-const MAX_IMAGE_BYTES = 2 * 1024 * 1024;
+const MAX_IMAGE_BYTES = 15 * 1024 * 1024;
 
 function ProductForm({ product, onDone }: { product: Product | null; onDone: () => void }) {
   const queryClient = useQueryClient();
@@ -97,10 +97,10 @@ function ProductForm({ product, onDone }: { product: Product | null; onDone: () 
         />
       </div>
       <TextField
-        label="Image (PNG, JPEG ou WebP, 2 Mo maximum)"
+        label="Image (PNG, JPEG ou WebP, 15 Mo maximum)"
         type="file"
         accept="image/png,image/jpeg,image/webp"
-        error={imageTooLarge ? 'Cette image dépasse 2 Mo.' : null}
+        error={imageTooLarge ? 'Cette image dépasse 15 Mo.' : null}
         onChange={(event) => setImage(event.target.files?.[0] ?? null)}
       />
       <label className="flex items-center gap-2 text-sm">

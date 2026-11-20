@@ -65,7 +65,7 @@ server {
     server_name epicoin.campus.epitech.eu;
     # ssl_certificate … ; ssl_certificate_key … ;
     add_header Strict-Transport-Security "max-age=31536000" always;
-    client_max_body_size 3m;
+    client_max_body_size 16m;
 
     location / {
         proxy_pass http://127.0.0.1:8088;

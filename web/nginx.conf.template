@@ -6,8 +6,8 @@ server {
     root /usr/share/nginx/html;
     server_tokens off;
 
-    # Product images are at most 2 MB.
-    client_max_body_size 3m;
+    # Product images are at most 15 MB (MAX_IMAGE_BYTES in the API).
+    client_max_body_size 16m;
 
     # When a reverse proxy (TLS termination) sits in front, trust its X-Forwarded-For so
     # that the API sees each user's real address (login rate limiting).

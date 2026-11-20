@@ -10,6 +10,7 @@ use common::*;
 use epicoin_api::chain::{record_tx, TxMeta};
 use epicoin_api::models::Role;
 use epicoin_api::shop::orders::order_ref;
+use epicoin_api::shop::products::MAX_IMAGE_BYTES;
 use epicoin_core::{Transaction, TxPayload};
 use serde_json::{json, Value};
 use sqlx::PgPool;
@@ -321,10 +322,16 @@ async fn product_images_are_uploaded_checked_and_served(db: PgPool) {
         assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
         assert_eq!(body["error"], "invalid_image");
     }
-    let mut huge = PNG.to_vec();
-    huge.resize(3 * 1024 * 1024, 0);
-    let (status, _) = upload(&shop.app, &shop.manager, &path, huge).await;
+    // A photo straight from a phone fits; one byte more than the limit does not.
+    let mut photo = PNG.to_vec();
+    photo.resize(MAX_IMAGE_BYTES, 0);
+    let (status, body) = upload(&shop.app, &shop.manager, &path, photo.clone()).await;
+    assert_eq!(status, StatusCode::OK, "{body:?}");
+    let url = body["image_url"].as_str().unwrap().to_owned();
+    photo.push(0);
+    let (status, body) = upload(&shop.app, &shop.manager, &path, photo).await;
     assert_eq!(status, StatusCode::PAYLOAD_TOO_LARGE);
+    assert_eq!(body["error"], "image_too_large");
 
     // Replacing the image removes the old file.
     let mut jpeg = vec![0xFF, 0xD8, 0xFF, 0xE0];
