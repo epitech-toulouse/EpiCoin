@@ -21,12 +21,14 @@ import {
   X,
   type LucideIcon,
 } from 'lucide-react';
-import { useState, type ReactNode } from 'react';
-import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useState, type ReactNode } from 'react';
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { homeOf, useAuth } from '../auth';
 import { useCart } from '../cart';
+import { api } from '../lib/api';
 import { fullName, ROLE_LABELS } from '../lib/format';
-import type { Role } from '../lib/types';
+import type { NewsSection, Notifications, Role, TodoSection } from '../lib/types';
 import { cx } from './ui';
 
 interface NavItem {
@@ -36,6 +38,63 @@ interface NavItem {
   /** Colour of the icon when the item is not selected. */
   color: string;
   end?: boolean;
+  /** Shows a "!" when this section has something new or waiting. */
+  notify?: NewsSection | TodoSection;
+}
+
+/** The page of each news section, and the data to reload once its news is seen. */
+const NEWS_PAGES: Record<string, { section: NewsSection; refresh: string[] }> = {
+  '/': { section: 'balance', refresh: ['wallet', 'history'] },
+  '/commandes': { section: 'orders', refresh: ['orders'] },
+  '/defis': { section: 'challenges', refresh: ['challenges'] },
+};
+
+const TODO_SECTIONS: ReadonlySet<string> = new Set<TodoSection>(['shop_orders', 'challenge_reviews']);
+
+/**
+ * The counts behind the "!" of the menu, refreshed every 30 seconds. Opening the page of a
+ * news section marks it as seen (and reloads its data, so that the news is on screen).
+ */
+function useNotifications(loggedIn: boolean): Notifications {
+  const queryClient = useQueryClient();
+  const { pathname } = useLocation();
+  const counts = useQuery({
+    queryKey: ['notifications'],
+    queryFn: () => api<Notifications>('/api/me/notifications'),
+    refetchInterval: 30_000,
+    enabled: loggedIn,
+  });
+  const page = NEWS_PAGES[pathname];
+  const section = page?.section;
+  const hasNews = section !== undefined && (counts.data?.[section] ?? 0) > 0;
+  const { mutate: markSeen } = useMutation({
+    mutationFn: (seen: NewsSection) =>
+      api<void>('/api/me/notifications/seen', { method: 'POST', body: { section: seen } }),
+    onSuccess: (_, seen) => {
+      void queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      const refresh = Object.values(NEWS_PAGES).find((p) => p.section === seen)?.refresh ?? [];
+      for (const key of refresh) void queryClient.invalidateQueries({ queryKey: [key] });
+    },
+  });
+  useEffect(() => {
+    if (hasNews && section) markSeen(section);
+  }, [hasNews, section, markSeen]);
+  return counts.data ?? {};
+}
+
+/** The "!" next to a menu entry; screen readers hear what it means. */
+function NotificationMark({ todo, inverted }: { todo: boolean; inverted: boolean }) {
+  return (
+    <span
+      className={cx(
+        'ml-auto inline-flex size-5 shrink-0 items-center justify-center rounded-full font-mono text-xs font-bold',
+        inverted ? 'bg-white text-red-700' : 'bg-red-700 text-white',
+      )}
+    >
+      <span aria-hidden="true">!</span>
+      <span className="sr-only">{todo ? ' — à traiter' : ' — nouveau'}</span>
+    </span>
+  );
 }
 
 interface NavSection {
@@ -48,14 +107,26 @@ const DISTRIBUTION: NavSection = {
   items: [
     { to: '/distribuer', label: 'Distribuer', icon: Gift, color: 'text-brand-600' },
     { to: '/distributions', label: 'Mes distributions', icon: History, color: 'text-accent' },
-    { to: '/gestion/defis', label: 'Défis', icon: Trophy, color: 'text-teal' },
+    {
+      to: '/gestion/defis',
+      label: 'Défis',
+      icon: Trophy,
+      color: 'text-teal',
+      notify: 'challenge_reviews',
+    },
   ],
 };
 
 const SHOP_MANAGEMENT: NavSection = {
   title: 'Boutique',
   items: [
-    { to: '/gestion/commandes', label: 'Commandes', icon: ClipboardList, color: 'text-accent' },
+    {
+      to: '/gestion/commandes',
+      label: 'Commandes',
+      icon: ClipboardList,
+      color: 'text-accent',
+      notify: 'shop_orders',
+    },
     { to: '/gestion/produits', label: 'Produits', icon: Package, color: 'text-teal' },
   ],
 };
@@ -65,9 +136,22 @@ const MENUS: Record<Role, NavSection[]> = {
     {
       title: 'Mon espace',
       items: [
-        { to: '/', label: 'Mon solde', icon: Wallet, color: 'text-brand-600', end: true },
-        { to: '/commandes', label: 'Mes commandes', icon: ShoppingBag, color: 'text-accent' },
-        { to: '/defis', label: 'Défis', icon: Trophy, color: 'text-ok' },
+        {
+          to: '/',
+          label: 'Mon solde',
+          icon: Wallet,
+          color: 'text-brand-600',
+          end: true,
+          notify: 'balance',
+        },
+        {
+          to: '/commandes',
+          label: 'Mes commandes',
+          icon: ShoppingBag,
+          color: 'text-accent',
+          notify: 'orders',
+        },
+        { to: '/defis', label: 'Défis', icon: Trophy, color: 'text-ok', notify: 'challenges' },
         { to: '/envoyer', label: 'Envoyer des EPC', icon: Send, color: 'text-teal' },
       ],
     },
@@ -113,7 +197,13 @@ export function Logo({ className }: { className?: string }) {
   );
 }
 
-function Navigation({ onNavigate }: { onNavigate?: () => void }) {
+function Navigation({
+  notifications,
+  onNavigate,
+}: {
+  notifications: Notifications;
+  onNavigate?: () => void;
+}) {
   const { user } = useAuth();
   const { count } = useCart();
   if (!user) return null;
@@ -127,7 +217,7 @@ function Navigation({ onNavigate }: { onNavigate?: () => void }) {
             <span aria-hidden="true"> /&gt;</span>
           </p>
           <ul className="space-y-0.5">
-            {section.items.map(({ to, label, icon: Icon, color, end }) => (
+            {section.items.map(({ to, label, icon: Icon, color, end, notify }) => (
               <li key={to}>
                 <NavLink
                   to={to}
@@ -148,6 +238,9 @@ function Navigation({ onNavigate }: { onNavigate?: () => void }) {
                         strokeWidth={1.75}
                       />
                       {label}
+                      {notify && (notifications[notify] ?? 0) > 0 && (
+                        <NotificationMark todo={TODO_SECTIONS.has(notify)} inverted={isActive} />
+                      )}
                       {to === '/panier' && count > 0 && (
                         <span
                           className={cx(
@@ -175,7 +268,9 @@ export function Layout() {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
+  const notifications = useNotifications(user !== null && user !== undefined);
   if (!user) return null;
+  const anyNotification = Object.values(notifications).some((count) => (count ?? 0) > 0);
 
   const logout = async () => {
     setMenuOpen(false);
@@ -239,6 +334,12 @@ export function Layout() {
               <Menu aria-hidden="true" className="size-5" />
             )}
             Menu
+            {anyNotification && !menuOpen && (
+              <span className="inline-flex size-5 items-center justify-center rounded-full bg-white font-mono text-xs font-bold text-red-700">
+                <span aria-hidden="true">!</span>
+                <span className="sr-only"> — nouveautés</span>
+              </span>
+            )}
           </button>
         </div>
       </header>
@@ -249,7 +350,7 @@ export function Layout() {
           aria-label="Navigation principale"
           className="border-b border-line bg-white px-3 pt-5 pb-3 md:hidden"
         >
-          <Navigation onNavigate={() => setMenuOpen(false)} />
+          <Navigation notifications={notifications} onNavigate={() => setMenuOpen(false)} />
           <div className="border-t border-line px-3 pt-3">
             <p className="text-sm font-medium">{fullName(user)}</p>
             <p className="label-mono mb-2 text-slate-500">{ROLE_LABELS[user.role]}</p>
@@ -271,7 +372,7 @@ export function Layout() {
             aria-label="Navigation principale"
             className="sticky top-14 max-h-[calc(100dvh-3.5rem)] overflow-y-auto px-3 pt-6"
           >
-            <Navigation />
+            <Navigation notifications={notifications} />
           </nav>
         </aside>
         <main id="contenu" className="min-w-0 flex-1 px-4 py-6 md:px-6">

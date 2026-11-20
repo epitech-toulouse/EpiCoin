@@ -50,6 +50,8 @@ async fn protected_endpoints_require_a_session(db: PgPool) {
         (Method::POST, "/api/transfers".into()),
         (Method::GET, "/api/transfers/recipients".into()),
         (Method::GET, "/api/admin/transfers".into()),
+        (Method::GET, "/api/me/notifications".into()),
+        (Method::POST, "/api/me/notifications/seen".into()),
         (Method::POST, format!("/api/challenges/{id}/answer")),
         (Method::POST, format!("/api/challenges/{id}/submission")),
         (Method::GET, "/api/admin/users".into()),

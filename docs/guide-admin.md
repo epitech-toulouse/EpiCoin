@@ -196,6 +196,9 @@ synchronisation suivante (5 minutes au plus). La gestion de la boutique lui est 
 - **Supprimer** un compte (droit à l'effacement) : nom, email, cohorte, sessions et clé du
   portefeuille sont effacés de la base. La chaîne garde l'adresse et ses mouvements, que plus
   rien ne relie à une personne. Les EPC restants deviennent inutilisables. Irréversible.
+- Un **!** dans le menu signale ce qui attend : des commandes à préparer (**Commandes**), des
+  participations aux défis à valider (**Défis**). Les étudiants voient aussi un **!** pour
+  leurs nouveautés : EPC reçus, commande prête, nouveau défi.
 - Les **échanges** entre étudiants (menu Échanges) : qui a envoyé combien à qui, avec le
   message éventuel, pour modérer. Les messages sont effacés avec le compte de l'envoyeur ou du
   destinataire.

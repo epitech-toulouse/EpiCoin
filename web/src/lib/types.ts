@@ -155,6 +155,11 @@ export interface AdminTransfer {
   created_at: string;
 }
 
+/** What shows a "!" in the menu: news for students, to-dos for the others. */
+export type NewsSection = 'balance' | 'orders' | 'challenges';
+export type TodoSection = 'shop_orders' | 'challenge_reviews';
+export type Notifications = Partial<Record<NewsSection | TodoSection, number>>;
+
 export interface Quota {
   active: boolean;
   quota: number;

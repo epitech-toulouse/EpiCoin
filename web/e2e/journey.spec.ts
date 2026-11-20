@@ -218,11 +218,16 @@ test('the student buys a product', async () => {
 });
 
 test('the shop manager prepares and hands over the order', async () => {
+  // A paid order waits: the menu says so until it is handled.
+  await manager.reload();
+  await expect(manager.getByRole('link', { name: 'Commandes — à traiter' })).toBeVisible();
   await manager.getByRole('link', { name: 'Commandes' }).click();
   await expect(manager.getByText('Ada Lovelace')).toBeVisible();
   await expect(manager.getByText('1 × Mug EpiCoin')).toBeVisible();
   await manager.getByRole('button', { name: 'Marquer comme prête' }).click();
   await expect(manager.getByText('Aucune commande dans cette file.')).toBeVisible();
+  await manager.reload();
+  await expect(manager.getByRole('link', { name: 'Commandes', exact: true })).toBeVisible();
 
   await manager.getByRole('tab', { name: 'Prêtes à remettre' }).click();
   await manager.getByRole('button', { name: 'Valider la remise' }).click();
@@ -237,7 +242,7 @@ test('the shop manager prepares and hands over the order', async () => {
 });
 
 test('the student sees the order as delivered', async () => {
-  await student.getByRole('link', { name: 'Mes commandes', exact: true }).click();
+  await student.getByRole('link', { name: /^Mes commandes( — nouveau)?$/ }).click();
   await expect(student.getByText('Remise', { exact: true })).toBeVisible();
 });
 
@@ -265,7 +270,7 @@ test('a cancelled order is refunded', async ({ browser }) => {
   await manager.getByRole('button', { name: 'Annuler et rembourser' }).click();
   await expect(manager.getByText('Aucune commande dans cette file.')).toBeVisible();
 
-  await grace.getByRole('link', { name: 'Mes commandes', exact: true }).click();
+  await grace.getByRole('link', { name: /^Mes commandes( — nouveau)?$/ }).click();
   await expect(grace.getByText('Annulée et remboursée')).toBeVisible();
   await grace.getByRole('link', { name: 'Mon solde' }).click();
   await expect(grace.getByTestId('balance')).toHaveText(/^20\s*EPC$/);
@@ -353,7 +358,11 @@ test('a staff member posts a challenge and a student wins it', async () => {
   await staff.getByRole('button', { name: 'Créer le défi' }).click();
   await expect(staff.getByRole('cell', { name: /^Énigme du campus/ })).toBeVisible();
 
+  // The new challenge shows a "!" next to Défis, until the student opens the page.
+  await student.reload();
+  await expect(student.getByRole('link', { name: 'Défis — nouveau' })).toBeVisible();
   await student.getByRole('link', { name: 'Défis' }).click();
+  await expect(student.getByRole('link', { name: 'Défis', exact: true })).toBeVisible();
   const card = student.getByRole('article', { name: 'Énigme du campus' });
   await card.getByLabel('Votre réponse').fill('python');
   await card.getByRole('button', { name: 'Valider' }).click();

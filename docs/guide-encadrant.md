@@ -66,7 +66,8 @@ suite, sans distribution à faire.
 - **Gagnants maximum** et **date limite** (facultatifs). Vous pouvez aussi clore le défi à la
   main en le modifiant (**Défi terminé**).
 
-Chaque étudiant ne gagne un défi qu'une fois, même s'il clique deux fois. Les administrateurs
+Un **!** à côté de **Défis**, dans le menu, signale des participations qui attendent votre
+validation. Chaque étudiant ne gagne un défi qu'une fois, même s'il clique deux fois. Les administrateurs
 voient et peuvent modifier tous les défis.
 
 ## Bon à savoir

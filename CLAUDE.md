@@ -78,6 +78,8 @@ boutique, audit).
 - `transfers.rs` : échanges entre étudiants (`Transfer` signé par l'envoyeur, clé
   d'idempotence obligatoire). Le message reste dans la table `transfers`, jamais sur la chaîne,
   et est effacé avec le compte de l'une ou l'autre partie.
+- `notifications.rs` : le « ! » du menu (nouveautés depuis la dernière visite pour les
+  étudiants, table `section_visits` ; tâches à traiter pour les autres rôles).
 - Cohortes des étudiants : liste fermée `models::COHORTS` (code dans `users.promo`), seule
   source de la liste, y compris pour le front.
 - `users.rs`, `mint.rs`, `me.rs`, `admin.rs` : endpoints par rôle. Erreurs en JSON
