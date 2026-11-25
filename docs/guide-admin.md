@@ -184,7 +184,7 @@ le rôle d'un compte existant.
   est inscrite sur la chaîne.
 
 Un **administrateur distribue aussi**, depuis les menus **Distribuer**, **Mes
-distributions** et **Défis** (il y voit et modifie les défis de tous les encadrants), avec les mêmes règles qu'un encadrant : autorité sur la chaîne, quota par
+distributions**, **Valider un partage** et **Défis** (il y voit et modifie les défis de tous les encadrants), avec les mêmes règles qu'un encadrant : autorité sur la chaîne, quota par
 défaut ou personnel (champ quota de sa fiche), traçabilité dans l'audit. Le premier
 administrateur, créé en ligne de commande, reçoit son autorité au démarrage de l'API ou à la
 synchronisation suivante (5 minutes au plus). La gestion de la boutique lui est aussi ouverte.
@@ -205,6 +205,28 @@ synchronisation suivante (5 minutes au plus). La gestion de la boutique lui est 
 - Le **journal d'audit** (menu Audit) trace connexions, imports, changements de rôle et de
   quota, distributions, remboursements et suppressions, avec leur auteur et leur date. Il ne
   contient que des identifiants, jamais de nom ni d'email.
+
+### Les partages de connaissances
+
+Menu **Partages** (« Apprends-nous quelque chose ! », l'ancienne application Epicreds) : un
+étudiant apprend quelque chose à un encadrant, qui lui fait scanner un QR code ; les EPC sont
+versés aussitôt, sur le quota de l'encadrant (voir le guide de l'encadrant).
+
+- **Validations** : tous les partages scannés. **Annuler** (justification obligatoire, que
+  l'étudiant voit) retire un partage de la série, des badges et du classement de l'étudiant.
+  Les EPC versés restent : la blockchain ne les reprend pas.
+- **Classement** : les étudiants par EPC gagnés en partageant, bonus compris. Chacun peut s'en
+  retirer depuis sa page. C'est ici que se remet ou se retire le badge « Légende du campus ».
+- **Réglages** : montant conseillé et maximal d'un partage, validité d'un QR code (120 s par
+  défaut), nombre de partages par jour et par étudiant, jours ouvrés, fuseau horaire,
+  **jours de fermeture** (vacances, ponts : ils ne cassent pas les séries) et **paliers de
+  régularité** (par défaut +20 EPC à 5 jours d'affilée, +50 à 10, +100 à 20). Un changement de
+  calendrier ou de paliers vaut pour les prochains scans, y compris dans une série commencée :
+  faites-le plutôt entre deux périodes de cours.
+
+Le bonus d'un palier est payé par l'encadrant qui valide le partage du jour où il est atteint,
+en plus du partage. Avec de gros paliers, prévoyez des quotas en conséquence (fiche de
+l'encadrant ou `EPICOIN_DEFAULT_MINT_QUOTA_EPC`).
 
 ## 7. Sauvegarder et restaurer
 
@@ -334,7 +356,8 @@ docker compose up -d --build
 Les migrations de la base s'appliquent au démarrage de l'API.
 
 Quand une version change les règles de la chaîne (c'est le cas de celle qui autorise les
-échanges entre étudiants), le validateur et les réplicas doivent tourner sur la même version :
+échanges entre étudiants, et de celle qui ajoute le motif « partage de connaissance »), le
+validateur et les réplicas doivent tourner sur la même version :
 un réplica resté en arrière refuserait les nouveaux blocs. `docker compose up -d --build`
 met à jour tous les services d'un coup ; `epicoin-cli verify` doit lui aussi être à jour.
 

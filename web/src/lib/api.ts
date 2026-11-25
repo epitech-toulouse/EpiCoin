@@ -25,7 +25,7 @@ export function setCsrfToken(token: string | null): void {
 }
 
 interface Options {
-  method?: 'GET' | 'POST' | 'PATCH' | 'DELETE';
+  method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   /** Sent as JSON. */
   body?: unknown;
   /** Sent as is (file uploads). */

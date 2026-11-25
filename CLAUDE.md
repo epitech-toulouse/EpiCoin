@@ -42,8 +42,9 @@ boutique, audit).
 - Le genesis n'est pas un bloc : son hash est le `prev_hash` du bloc 1.
 - Types de transaction : `Mint`, `Purchase`, `Refund`, `AuthorityUpdate` et `Transfer`. Ce
   dernier était refusé en V1 ; il est accepté depuis la V2 (échanges entre étudiants), sauf
-  depuis la trésorerie et vers soi-même. Toute règle de chaîne qui change impose de mettre à
-  jour validateur et réplicas ensemble.
+  depuis la trésorerie et vers soi-même. Le motif `KnowledgeShare` (partages) a été ajouté à la
+  fin de `ReasonCode`. Toute règle de chaîne qui change impose de mettre à jour validateur et
+  réplicas ensemble.
 
 ### Nœud (`epicoin-node`)
 
@@ -75,6 +76,11 @@ boutique, audit).
 - `challenges.rs` : défis (réponse à trouver ou validation par un encadrant). Le gain est un
   `Mint` signé par le créateur du défi, sur son quota ; la participation `approved` et la
   transaction sont écrites ensemble. Lire l'en-tête du module avant d'y toucher.
+- `shares/` : partages de connaissances (ex-application Epicreds, « Apprends-nous quelque
+  chose ! »). Un encadrant génère un QR code ; l'étudiant le scanne et reçoit un `Mint` signé par
+  l'encadrant, sur son quota, bonus de série compris (`claim.rs`). Règles pures (jours ouvrés,
+  séries, badges calculés) dans `calendar.rs` et `badges.rs` ; réglages en base
+  (`share_settings`). Lire l'en-tête de `shares/mod.rs` avant d'y toucher.
 - `transfers.rs` : échanges entre étudiants (`Transfer` signé par l'envoyeur, clé
   d'idempotence obligatoire). Le message reste dans la table `transfers`, jamais sur la chaîne,
   et est effacé avec le compte de l'une ou l'autre partie.
@@ -99,6 +105,9 @@ boutique, audit).
   `ActionCard`, `Tabs`, `Meter`, `Donut`, `SegmentedBar`). Réutiliser ces composants plutôt que
   des classes ad hoc. Le `_` final des titres est décoratif (`aria-hidden`).
 - Toute l'interface est en français ; les textes d'erreur viennent de l'API (`message`).
+- Partages : noms des mentions et badges dans `src/lib/shares.ts` (l'API ne connaît que les
+  codes), QR code et tuiles dans `src/components/shares.tsx`. Le QR ouvre `/partage#token=…`
+  (route publique) qui range le jeton en `sessionStorage` puis mène à `/partages/recuperer`.
 - `e2e/journey.spec.ts` : le parcours complet sur une pile réelle (`e2e/stack.mjs`).
 
 ## Invariants à ne jamais casser

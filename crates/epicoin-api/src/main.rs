@@ -221,8 +221,8 @@ async fn seed_demo(config: Config, db: PgPool) -> anyhow::Result<()> {
     let report = epicoin_api::demo::seed(&state, DEMO_PASSWORD, distributions).await?;
     println!("Demo data created:");
     println!(
-        "  {} students, {} products, {} distributions on chain",
-        report.students, report.products, report.mints
+        "  {} students, {} products, {} distributions and {} knowledge shares on chain",
+        report.students, report.products, report.mints, report.shares
     );
     println!("  Demo accounts (password for all: {DEMO_PASSWORD}):");
     for (role, email) in report.accounts {

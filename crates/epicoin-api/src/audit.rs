@@ -26,6 +26,11 @@ pub mod action {
     pub const CHALLENGE_REWARDED: &str = "challenges.rewarded";
     pub const CHALLENGE_SUBMISSION_REJECTED: &str = "challenges.submission_rejected";
     pub const TRANSFER_SENT: &str = "transfers.sent";
+    pub const SHARE_CLAIMED: &str = "shares.claimed";
+    pub const SHARE_CANCELLED: &str = "shares.cancelled";
+    pub const SHARE_SETTINGS_UPDATED: &str = "shares.settings_updated";
+    pub const SHARE_LEGEND_GRANTED: &str = "shares.legend_granted";
+    pub const SHARE_LEGEND_REMOVED: &str = "shares.legend_removed";
     pub const PRODUCT_CREATED: &str = "shop.product_created";
     pub const PRODUCT_UPDATED: &str = "shop.product_updated";
     pub const PRODUCT_DELETED: &str = "shop.product_deleted";

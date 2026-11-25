@@ -610,10 +610,29 @@ export function Tabs<T extends string>({
 
 // --- Figures and charts ----------------------------------------------------------------
 
-/** How full something is (a quota): one bar, a lighter track of the same hue. */
-export function Meter({ value, max, label }: { value: number; max: number; label: string }) {
+/**
+ * How full something is: one bar, a lighter track. A quota turns amber then red as it fills;
+ * give a `tone` for progress towards a goal, where full is good news.
+ */
+export function Meter({
+  value,
+  max,
+  label,
+  tone: fixed,
+}: {
+  value: number;
+  max: number;
+  label: string;
+  tone?: Tone;
+}) {
   const share = max > 0 ? Math.min(value / max, 1) : 0;
-  const tone = share >= 1 ? 'bg-danger' : share >= 0.8 ? 'bg-warn' : 'bg-brand-600';
+  const tone = fixed
+    ? TONE_BAR[fixed]
+    : share >= 1
+      ? 'bg-danger'
+      : share >= 0.8
+        ? 'bg-warn'
+        : 'bg-brand-600';
   return (
     <div
       role="meter"

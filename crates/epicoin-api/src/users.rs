@@ -726,6 +726,20 @@ async fn delete_user(
     .bind(id)
     .execute(&mut *tx)
     .await?;
+    // So are the topics of the knowledge shares they made, and why one was cancelled; the
+    // topic is also in the comment of the payment.
+    sqlx::query(
+        "UPDATE mint_batches SET comment = 'Partage de connaissance' WHERE id IN \
+           (SELECT c.batch_id FROM shares s JOIN chain_txs c ON c.hash = s.tx_hash \
+            WHERE s.student_user_id = $1)",
+    )
+    .bind(id)
+    .execute(&mut *tx)
+    .await?;
+    sqlx::query("UPDATE shares SET topic = '', cancel_reason = '' WHERE student_user_id = $1")
+        .bind(id)
+        .execute(&mut *tx)
+        .await?;
     sqlx::query("DELETE FROM users WHERE id = $1")
         .bind(id)
         .execute(&mut *tx)

@@ -8,6 +8,7 @@
 //! - [`mint`]: distributions by staff and admins.
 //! - [`challenges`]: challenges whose winners are paid at once.
 //! - [`transfers`]: students sending EPC to each other.
+//! - [`shares`]: knowledge shares paid by QR code, streaks, badges and ranking.
 //! - [`notifications`]: what shows a "!" in each user's menu.
 //! - [`me`]: balance and history of the logged-in user.
 //! - [`shop`]: products, orders paid on chain, refunds.
@@ -29,6 +30,7 @@ pub mod models;
 pub mod notifications;
 pub mod ratelimit;
 pub mod secrets;
+pub mod shares;
 pub mod shop;
 pub mod state;
 pub mod transfers;
@@ -62,6 +64,7 @@ pub fn router(state: AppState) -> Router {
         .nest("/shop", shop::router())
         .merge(challenges::router())
         .merge(transfers::router())
+        .merge(shares::router())
         .merge(notifications::router())
         .fallback(|| async { ApiError::not_found("Ressource") });
     Router::new()

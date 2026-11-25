@@ -23,6 +23,8 @@ csv = "1.4"
 ed25519-dalek = "3.0"
 getrandom = "0.3"
 hex = "0.4"
+# Only the matrix: the browser draws it.
+qrcode = { version = "0.15", default-features = false, features = ["std"] }
 lettre = { version = "0.11", default-features = false, features = ["builder", "smtp-transport", "tokio1-rustls-tls", "pool", "hostname"] }
 redb = "4.6"
 # Plain HTTP only: services talk to each other on a private network.

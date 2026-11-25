@@ -12,7 +12,8 @@ async fn demo_seed_builds_a_usable_platform(db: PgPool) {
     let report = demo::seed(&app.state, "demo password", true).await.unwrap();
     assert_eq!(report.students, 150);
     assert_eq!(report.products, 10);
-    assert_eq!(report.mints, 5 * (20 + 10 + 5));
+    assert_eq!(report.mints, 5 * (16 + 10 + 5));
+    assert_eq!(report.shares, 20);
 
     let count = |sql: &'static str| {
         let db = app.db.clone();
@@ -44,7 +45,7 @@ async fn demo_seed_builds_a_usable_platform(db: PgPool) {
     let status = app.node.status();
     assert_eq!(
         status.total_minted,
-        5 * (20 * 1_000 + 10 * 1_500 + 5 * 2_000)
+        5 * (16 * 1_000 + 10 * 1_500 + 5 * 2_000) + 20 * 1_000
     );
 
     // The demo accounts work through the real login.
@@ -61,8 +62,25 @@ async fn demo_seed_builds_a_usable_platform(db: PgPool) {
         .await;
     assert_eq!(
         staff.get("/api/staff/distributions").await.body["total"],
-        35
+        31 + 4
     );
+    assert_eq!(staff.get("/api/staff/shares").await.body["total"], 4);
+
+    // The shares fill the ranking; the first student is on a four-day streak.
+    let ranking = staff.get("/api/shares/ranking").await.body;
+    assert_eq!(ranking["items"].as_array().unwrap().len(), 10);
+    assert_eq!(ranking["items"][0]["total"], 4_000);
+    let first_student = &report
+        .accounts
+        .iter()
+        .find(|(role, _)| *role == epicoin_api::models::Role::Student)
+        .unwrap()
+        .1;
+    let mut student = app.client();
+    student.login(first_student, "demo password").await;
+    let mine = student.get("/api/shares/me").await.body;
+    assert_eq!(mine["progress"]["current"], 4);
+    assert_eq!(mine["shares"], 4);
 
     // A second run is refused: demo data never lands on a platform in use.
     assert!(demo::seed(&app.state, "demo password", true).await.is_err());
@@ -77,6 +95,7 @@ async fn demo_seed_can_start_every_balance_at_zero(db: PgPool) {
         .unwrap();
     assert_eq!(report.students, 150);
     assert_eq!(report.mints, 0);
+    assert_eq!(report.shares, 0);
 
     // Nobody holds anything, but the staff can distribute their full quota.
     let status = app.node.status();

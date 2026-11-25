@@ -70,10 +70,41 @@ Un **!** à côté de **Défis**, dans le menu, signale des participations qui a
 validation. Chaque étudiant ne gagne un défi qu'une fois, même s'il clique deux fois. Les administrateurs
 voient et peuvent modifier tous les défis.
 
+## Valider un partage
+
+« Apprends-nous quelque chose ! » Un étudiant vient vous raconter une astuce, une anecdote, une
+découverte ? Récompensez-le en quelques secondes : menu **Valider un partage**.
+
+1. Choisissez le **montant** (10 EPC conseillés par défaut ; le maximum est fixé par les
+   administrateurs).
+2. Ajoutez si vous voulez une **mention** (Genius, WTF?!, Life Hack…) : elle s'affiche dans la
+   collection de badges de l'étudiant, sans EPC en plus.
+3. Notez le **sujet** si vous voulez : l'étudiant le retrouve dans son historique. Il reste dans la
+   base de la plateforme, jamais sur la blockchain.
+4. **Générer le QR code**, et montrez l'écran à l'étudiant. Il le scanne avec l'appareil photo
+   de son téléphone, se connecte si besoin, puis touche **Récupérer mes EPC**. Votre écran
+   affiche aussitôt qui l'a reçu.
+
+Le QR code ne sert qu'une fois et n'est valable que deux minutes (réglage des
+administrateurs). Générer un nouveau QR code retire le précédent. **Retirer ce QR code** le
+désactive s'il n'a pas encore été scanné. Pas d'appareil photo ? **Copier le lien** et
+envoyez-le à l'étudiant : il l'ouvre une fois connecté. Ne le publiez pas : le premier qui
+l'ouvre récupère les EPC.
+
+Les EPC sont prélevés sur **votre quota** (motif « Partage de connaissance »). Quand un
+étudiant partage plusieurs jours ouvrés d'affilée, le scan qui atteint un palier (5, 10 et
+20 jours par défaut) lui verse en plus un **bonus de régularité**, dans le même versement, et
+lui aussi sur votre quota : votre écran l'indique. Si votre quota ne couvre pas le partage
+bonus compris, l'étudiant est prévenu et rien n'est versé.
+
+Le tableau **Mes validations** liste les partages que vous avez validés. Seul un administrateur
+peut annuler un partage (doublon, erreur) : il sort alors de la série, des badges et du
+classement de l'étudiant, mais les EPC versés restent les siens.
+
 ## Bon à savoir
 
 - Une distribution confirmée est **définitive** : la blockchain ne permet pas de l'annuler. En cas
-  d'erreur, prévenez un administrateur.
+  d'erreur, prévenez un administrateur. C'est vrai aussi d'un partage scanné.
 - La blockchain n'enregistre que des adresses, des montants et le motif. Votre nom, celui de
   l'étudiant et votre commentaire restent dans la base de la plateforme.
 - Vous ne pouvez distribuer qu'aux étudiants, et jamais à vous-même.

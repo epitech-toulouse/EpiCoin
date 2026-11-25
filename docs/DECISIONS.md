@@ -30,9 +30,10 @@ Choix non imposés par la spécification, avec leur raison. À compléter au fil
 | C14 | V1 : `Transfer` est dans le format mais toujours rejeté (`TransfersDisabled`). **Révisé en V2** : `Transfer` est accepté, sauf depuis la trésorerie (`TreasuryCannotTransfer`) et vers soi-même (`SelfTransfer`) ; deux codes d'erreur ajoutés à la fin, `TransfersDisabled` conservé. | Le format des transactions ne change pas. Aucun bloc existant ne contient de `Transfer` (ils étaient refusés), donc tout l'historique se rejoue à l'identique ; en revanche un nœud V1 refuserait un bloc V2 : validateur et réplicas se mettent à jour ensemble. La trésorerie ne doit servir qu'aux remboursements. |
 | C15 | Validateur attendu à la hauteur `h` : `validators[(h - 1) % n]`. | Round-robin prêt pour plusieurs validateurs ; avec `n = 1` c'est toujours le même. |
 | C16 | Une distribution groupée = N transactions `Mint`. | Pas de type de transaction supplémentaire. |
-| C17 | Motifs (`ReasonCode`) : participation, entraide, projet remarquable, événement, vie du campus, défi, autre. | Liste validée ; extensible en ajoutant à la fin. |
+| C17 | Motifs (`ReasonCode`) : participation, entraide, projet remarquable, événement, vie du campus, défi, autre ; **partage de connaissance** ajouté à la fin (voir C20). | Liste validée ; extensible en ajoutant à la fin. |
 | C18 | Les blocs vides sont valides. | Permet un heartbeat optionnel côté nœud. |
 | C19 | La clé admin est détenue en ligne par l'API (chiffrée). | Validé : nommer un encadrant se fait depuis l'interface. Contrepartie notée dans le modèle de menace. |
+| C20 | Motif `KnowledgeShare = 7` (`knowledge_share`) pour les partages de connaissances (ex-Epicreds). | Les statistiques par motif et l'explorateur distinguent les partages. Aucun encodage existant ne change (ajout à la fin), mais un nœud plus ancien refuserait un bloc qui contient ce motif : validateur et réplicas se mettent à jour ensemble, comme pour C14. |
 
 ## Nœud et CLI (`epicoin-node`, `epicoin-cli`)
 
@@ -113,6 +114,29 @@ Choix non imposés par la spécification, avec leur raison. À compléter au fil
 | T3 | Message facultatif de 140 caractères dans la table `transfers`, jamais sur la chaîne ; effacé quand le compte de l'envoyeur ou du destinataire est supprimé. Les admins voient tous les échanges et leurs messages (menu Échanges). | RGPD (aucun texte libre on-chain) ; modération possible. |
 | T4 | Clé d'idempotence obligatoire, unique par envoyeur, comme au paiement (F5). | Un double clic ou un nouvel essai après une coupure n'envoie jamais deux fois. |
 | T5 | Dans `chain_txs`, l'envoyeur est l'`actor` et le destinataire le `subject` ; l'historique d'un étudiant liste ce qu'il reçoit et ce qu'il envoie. | Pas de colonne en plus pour les deux parties. |
+
+## Partages de connaissances (`epicoin-api::shares`)
+
+L'application Epicreds (« Apprends-nous quelque chose ! ») intégrée comme une fonctionnalité
+d'EpiCoin : un étudiant apprend quelque chose à un encadrant, qui affiche un QR code ; l'étudiant
+le scanne et reçoit des EPC.
+
+| # | Décision | Raison |
+|---|---|---|
+| P1 | Ce qu'Epicreds faisait déjà autrement dans EpiCoin n'est pas repris : comptes et connexion d'EpiCoin (pas d'OAuth GitHub ni de liste d'accès), boutique d'EpiCoin, journal d'audit, effacement des comptes. La monnaie est l'EPC (mêmes ordres de grandeur que les EC : 10 EPC conseillés, 100 au plus). | Une seule plateforme, une seule monnaie ; rien à maintenir en double. |
+| P2 | Le paiement est **un** `Mint` signé par l'encadrant qui a généré le QR code, motif `knowledge_share`, sur son quota. | Comme les défis (C2 des défis) : pas de clé ni d'autorité propre à la fonctionnalité ; toute émission reste plafonnée par le quota d'une personne. |
+| P3 | Le bonus de régularité est **payé par l'encadrant du scan qui complète le palier**, dans le même `Mint` que le partage. Si son quota ne couvre pas partage + bonus, le scan est refusé et rien n'est écrit. | Choix du porteur du projet. Une seule transaction : impossible de payer le partage sans le bonus ou l'inverse. Contrepartie : un encadrant peut payer plus que le montant affiché (le guide le dit). |
+| P4 | Un bonus par série et par palier : la clé est (étudiant, premier jour de la série, nombre de jours). Le scan verrouille la ligne de l'étudiant. | Deux QR codes scannés en même temps par le même étudiant ne paient pas deux fois le même bonus, ni ne dépassent la limite quotidienne (testé). |
+| P5 | Annulation par un admin, avec justification, **hors chaîne** : le partage sort des séries, des badges et du classement ; les EPC restent. Seul un partage scanné s'annule ; un QR non scanné se retire. | Choix du porteur du projet. La chaîne ne peut pas reprendre d'EPC ni créer de solde négatif (Epicreds le faisait) ; un nouveau type de transaction n'en valait pas la peine. |
+| P6 | Les bonus ne sont jamais recalculés après coup : ils se paient au scan qui atteint le palier, et un bonus déjà payé n'est pas repris si une annulation casse la série. | Pas de régularisation monétaire à faire hors chaîne ; les EPC versés sont définitifs, comme toute distribution. |
+| P7 | Les badges sont **calculés** à partir des partages valides, sauf « Légende du campus » (table `share_legends`). | Une annulation retire d'elle-même les badges concernés, sans réconciliation (Epicreds les stockait et les réconciliait). |
+| P8 | Le jour d'un partage (`claim_day`) est figé au scan, dans le fuseau du campus (calculé par Postgres) ; jours ouvrés, fermetures et paliers s'appliquent avec les réglages du moment. | Changer de fuseau ne déplace pas l'historique ; changer le calendrier vaut pour la suite, comme dans Epicreds. |
+| P9 | Le secret du QR code (256 bits, stocké hashé) voyage dans le fragment du lien `/partage#token=…`, mis aussitôt en `sessionStorage` puis effacé après le scan ; l'API ne le reçoit que dans le corps des requêtes. Un nouveau QR code invalide le précédent de l'encadrant. Validité réglable, **120 s** par défaut (60 dans Epicreds). | Même règle que les liens d'activation (A5). 120 s laissent le temps de se connecter sur son téléphone avant de récupérer. |
+| P10 | Le QR code est calculé par l'API (crate `qrcode`, sans rendu) et dessiné par le navigateur en un chemin SVG noir sur blanc, marge de 4 modules. | Ni bibliothèque côté front, ni image `data:` à autoriser dans la CSP. |
+| P11 | Classement : étudiants actifs ayant au moins un partage valide, par EPC gagnés en partageant (bonus compris), ex aequo au même rang. Affiché sous la forme « Prénom N. » et cohorte ; chacun peut s'en retirer (`users.hidden_from_ranking`). | Choix du porteur du projet (présent par défaut, retrait possible). Le nom complet n'apporte rien au classement ; l'identifiant n'est donné qu'aux admins (badge légende). |
+| P12 | Sujet, mention, justification d'annulation : en base seulement. À l'effacement d'un étudiant, ses sujets, les justifications et le commentaire de paiement (« Partage : … ») sont effacés. | RGPD : aucun texte libre sur la chaîne (vérifié par un test qui inspecte les blocs). |
+| P13 | Les réglages (montants, validité, calendrier, paliers, limite par jour) sont en base (`share_settings`, une ligne), modifiables par les admins dans l'interface. | Les fermetures du campus changent plusieurs fois par an : pas question de redémarrer l'API pour ça. |
+| P14 | Ni PWA ni service worker (Epicreds en avait). L'appareil photo du téléphone suffit à scanner ; le lien peut aussi être copié. | Le front EpiCoin n'en a pas ; une seule façon de faire. |
 
 ## Front (`web/`)
 

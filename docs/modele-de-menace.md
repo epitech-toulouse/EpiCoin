@@ -25,7 +25,7 @@ validateurs, connexion Microsoft 365…).
 
 | Menace | Parade |
 |---|---|
-| Créer des EPC sans y être autorisé | La machine d'état n'accepte un `Mint` que signé par une autorité active, dans la limite de son quota de la période ; l'API ne l'expose qu'aux encadrants et aux administrateurs, directement ou par les défis qu'ils créent (le gain est signé par le créateur, sur son quota). Vérifié jusqu'au niveau de la chaîne (une transaction forgée avec la clé d'un étudiant est refusée). |
+| Créer des EPC sans y être autorisé | La machine d'état n'accepte un `Mint` que signé par une autorité active, dans la limite de son quota de la période ; l'API ne l'expose qu'aux encadrants et aux administrateurs, directement, par les défis qu'ils créent ou par les partages qu'ils valident (le gain est signé par le créateur du défi ou l'encadrant du partage, sur son quota). Vérifié jusqu'au niveau de la chaîne (une transaction forgée avec la clé d'un étudiant est refusée). |
 | Dépenser deux fois, rejouer une transaction | Nonce par compte, signature liée à l'identifiant de la chaîne. Côté API, chaque transaction est enregistrée avant envoi et renvoyée à l'identique : un nouvel essai ne peut pas s'appliquer deux fois. Clés d'idempotence sur les paiements et les distributions. |
 | Altérer l'historique | Blocs chaînés par hash, signés par le validateur, racine de Merkle des transactions, racine de l'état. `epicoin-cli verify` et les réplicas rejouent tout depuis la genèse ; toute modification est détectée (testé, y compris sur une chaîne de 10 000 transactions). |
 | Encadrant abusif | Quota par période inscrit sur la chaîne ; journal d'audit ; statistiques par encadrant ; révocation immédiate. |
@@ -37,6 +37,8 @@ validateurs, connexion Microsoft 365…).
 | Fuite de secrets dans les journaux ou les réponses | Les types secrets n'ont ni sérialisation ni affichage lisible ; un test parcourt toute l'API et vérifie qu'aucune clé, aucun mot de passe ni aucun jeton n'apparaît dans une réponse ou un journal. |
 | Deviner la réponse d'un défi | Réponse stockée en Argon2id et jamais renvoyée par l'API ; 5 essais par étudiant et par défi toutes les 15 minutes. |
 | Se faire payer deux fois un défi | Le gagnant et sa transaction de versement sont écrits ensemble, sous verrou : une seconde tentative, même simultanée, est refusée (testé). |
+| Se faire payer deux fois un partage ou un bonus de régularité | Le partage scanné, son bonus et la transaction de versement sont écrits ensemble, sous le verrou du signataire, de la ligne du partage et de celle de l'étudiant : deux scans simultanés (du même QR code, ou de deux QR codes par le même étudiant) ne paient qu'une fois (testé). Le bonus d'un palier n'est versé qu'une fois par série. |
+| Récupérer le QR code d'un autre (photo, lien intercepté) | Secret de 256 bits stocké hashé, à usage unique, valable deux minutes par défaut ; un nouveau QR code invalide le précédent ; passé dans le fragment du lien, jamais dans les journaux ; 30 scans par minute et par étudiant. |
 | Envoyer des EPC à la place d'un autre étudiant | Un échange est signé par la clé de l'envoyeur, que seule l'API utilise, pour l'étudiant connecté (session + CSRF). La trésorerie ne peut pas transférer : son solde reste réservé aux remboursements. |
 | Messages injurieux joints aux échanges | Les administrateurs voient tous les échanges et leurs messages (menu Échanges) et peuvent désactiver un compte. |
 | Fichier malveillant envoyé comme image de produit | Format reconnu par le contenu (PNG, JPEG, WebP), nom choisi par le serveur, taille limitée, `nosniff`. |
@@ -75,6 +77,13 @@ une plateforme de campus.
    revente d'EPC contre de l'argent restent possibles. Choix assumé ; chaque échange est
    visible des administrateurs et sur la chaîne. Un plafond par jour s'ajouterait côté API sans
    toucher à la chaîne.
+10. **Un QR code de partage profite au premier qui le scanne.** Photographié par-dessus
+   l'épaule ou partagé sur une messagerie pendant ses deux minutes de validité, il peut payer
+   quelqu'un d'autre que l'étudiant visé. L'encadrant voit qui l'a reçu, et un administrateur
+   peut annuler le partage (les EPC restent acquis : la chaîne ne les reprend pas).
+11. **Bonus de régularité payés par l'encadrant du jour.** Il ne choisit pas ce montant ; s'il
+   n'a plus de quota, le scan est refusé jusqu'à ce qu'il en ait. Choix assumé : aucune clé
+   ni autorité propre aux partages.
 
 ## Ce qui reste à la charge de l'exploitation
 

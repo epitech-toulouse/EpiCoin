@@ -20,6 +20,7 @@ csv.workspace = true
 getrandom.workspace = true
 hex.workspace = true
 lettre.workspace = true
+qrcode.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sqlx.workspace = true

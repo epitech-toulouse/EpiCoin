@@ -1,4 +1,4 @@
-//! Demonstration data: fictitious users, products and distributions.
+//! Demonstration data: fictitious users, products, distributions and knowledge shares.
 //!
 //! Every demo account is already activated with the same, published password. This is only
 //! ever meant for a demo or a local trial: the command refuses to run on a database that
@@ -8,7 +8,7 @@ use std::collections::HashSet;
 use std::time::Duration;
 
 use anyhow::{bail, Context};
-use epicoin_core::{AuthorityAction, ReasonCode, TxPayload, UNITS_PER_EPC};
+use epicoin_core::{Address, AuthorityAction, Keypair, ReasonCode, TxPayload, UNITS_PER_EPC};
 use serde_json::json;
 use uuid::Uuid;
 
@@ -16,7 +16,7 @@ use crate::chain::TxMeta;
 use crate::models::{Role, User, COHORTS};
 use crate::state::AppState;
 use crate::users::{self, NewUser};
-use crate::{audit, secrets, wallets};
+use crate::{audit, secrets, shares, wallets};
 
 pub const STUDENTS: usize = 150;
 pub const STAFF: usize = 5;
@@ -125,7 +125,7 @@ const DISTRIBUTIONS: [(ReasonCode, u64, usize, &str); 3] = [
     (
         ReasonCode::Participation,
         10,
-        20,
+        16,
         "Merci pour votre présence à la soutenance.",
     ),
     (
@@ -141,6 +141,53 @@ const DISTRIBUTIONS: [(ReasonCode, u64, usize, &str); 3] = [
         "Vainqueurs du défi algorithmique de la semaine.",
     ),
 ];
+
+/// Knowledge shares validated by the staff on the last working days: student (index among
+/// the students), how many working days ago, topic, mention. Staff member `i % STAFF` validates
+/// share `i`, for [`SHARE_EPC`] each: the first student is on a four-day streak.
+const SHARES: [(usize, u32, &str, Option<&str>); 20] = [
+    (0, 1, "Pourquoi le ciel est bleu", Some("genius")),
+    (0, 2, "Le problème des généraux byzantins", None),
+    (0, 3, "Les raccourcis Vim indispensables", Some("life_hack")),
+    (0, 4, "Comment fonctionne un QR code", None),
+    (1, 1, "L'histoire du logo d'Unix", Some("wtf")),
+    (1, 2, "Faire son pain au levain", Some("culture_shock")),
+    (1, 3, "Les bases de la typographie", None),
+    (
+        2,
+        2,
+        "Un compilateur JIT en dix minutes",
+        Some("mad_scientist"),
+    ),
+    (2, 3, "Pourquoi les avions volent", None),
+    (2, 4, "Le jeu de la vie de Conway", Some("rabbit_hole")),
+    (3, 1, "Git bisect pour trouver un bug", Some("life_hack")),
+    (3, 6, "La musique générée par ordinateur", Some("showtime")),
+    (
+        4,
+        1,
+        "Les nombres flottants et leurs pièges",
+        Some("plot_twist"),
+    ),
+    (4, 6, "Le chiffre de Vigenère", None),
+    (
+        5,
+        2,
+        "Pourquoi le Japon conduit à gauche",
+        Some("culture_shock"),
+    ),
+    (
+        5,
+        7,
+        "Les fourmis et les algorithmes de graphe",
+        Some("mind_blown"),
+    ),
+    (6, 3, "Le fonctionnement d'un SSD", None),
+    (7, 1, "Unicode et les emojis", Some("wtf")),
+    (8, 4, "Les regex sans douleur", None),
+    (9, 5, "L'origine du mot bug", None),
+];
+const SHARE_EPC: u64 = 10;
 
 fn email_local_part(first: &str, last: &str) -> String {
     let fold = |text: &str| -> String {
@@ -224,6 +271,8 @@ pub struct SeedReport {
     pub students: usize,
     pub products: usize,
     pub mints: usize,
+    /// Knowledge shares validated by the staff.
+    pub shares: usize,
 }
 
 /// Fills an empty platform with demo data. Fails if any user already exists.
@@ -343,6 +392,18 @@ pub async fn seed(
             }
             addresses
         };
+        let mut shares_to_validate = Vec::new();
+        for (_, (student, days_ago, topic, mention)) in SHARES
+            .iter()
+            .enumerate()
+            .filter(|(i, _)| i % staff.len() == index)
+        {
+            let id = students[*student].id;
+            let address = wallets::address_of(&state.db, id)
+                .await
+                .map_err(|e| anyhow::anyhow!(e.message))?;
+            shares_to_validate.push((id, address, *days_ago, *topic, *mention));
+        }
         tasks.push(tokio::spawn(async move {
             let keypair = wallets::load_keypair(&state.db, &state.vault, staff_id)
                 .await
@@ -394,12 +455,25 @@ pub async fn seed(
                 let rows = state.chain.send_batch(&keypair, items, WAIT).await?;
                 minted += rows.iter().filter(|row| row.is_included()).count();
             }
-            anyhow::Ok(minted)
+            let mut validated = 0;
+            for (student, address, days_ago, topic, mention) in shares_to_validate {
+                if validate_share(
+                    &state, &keypair, staff_id, student, address, days_ago, topic, mention,
+                )
+                .await?
+                {
+                    validated += 1;
+                }
+            }
+            anyhow::Ok((minted, validated))
         }));
     }
     let mut mints = 0;
+    let mut shares = 0;
     for task in tasks {
-        mints += task.await.context("a demo distribution task panicked")??;
+        let (minted, validated) = task.await.context("a demo distribution task panicked")??;
+        mints += minted;
+        shares += validated;
     }
 
     let accounts = created
@@ -413,7 +487,92 @@ pub async fn seed(
         students: students.len(),
         products: PRODUCTS.len(),
         mints,
+        shares,
     })
+}
+
+/// A knowledge share validated `days_ago` working days ago: paid now, dated then. Returns
+/// whether its payment was included.
+#[allow(clippy::too_many_arguments)]
+async fn validate_share(
+    state: &AppState,
+    keypair: &Keypair,
+    staff_id: Uuid,
+    student: Uuid,
+    to: Address,
+    days_ago: u32,
+    topic: &str,
+    mention: Option<&str>,
+) -> anyhow::Result<bool> {
+    let settings = shares::Settings::load(&state.db)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.message))?;
+    let calendar = settings.calendar();
+    let mut day = shares::today(&state.db, &settings.time_zone)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.message))?;
+    for _ in 0..days_ago {
+        day = calendar
+            .previous_working_day(day)
+            .context("the campus calendar has no working day")?;
+    }
+    let amount = SHARE_EPC * UNITS_PER_EPC;
+    let reason = serde_json::to_value(ReasonCode::KnowledgeShare)?
+        .as_str()
+        .unwrap_or_default()
+        .to_owned();
+    let batch_id = Uuid::new_v4();
+    sqlx::query(
+        "INSERT INTO mint_batches (id, actor_user_id, amount, recipient_count, reason_code, comment) \
+         VALUES ($1, $2, $3, 1, $4, $5)",
+    )
+    .bind(batch_id)
+    .bind(staff_id)
+    .bind(amount as i64)
+    .bind(&reason)
+    .bind(format!("Partage : {topic}"))
+    .execute(&state.db)
+    .await?;
+    let row = state
+        .chain
+        .send(
+            keypair,
+            TxPayload::Mint {
+                to,
+                amount,
+                reason: ReasonCode::KnowledgeShare,
+            },
+            TxMeta {
+                actor_user_id: Some(staff_id),
+                subject_user_id: Some(student),
+                amount: Some(amount),
+                reason_code: Some(reason),
+                batch_id: Some(batch_id),
+                order_id: None,
+            },
+            WAIT,
+        )
+        .await?;
+    // Scanned at 11:00 on that day, campus time; the QR code expired right after.
+    sqlx::query(
+        "INSERT INTO shares (id, token_hash, staff_user_id, student_user_id, amount, standard, \
+           mention, topic, expires_at, claimed_at, claim_day, tx_hash) \
+         SELECT $1, $2, $3, $4, $5, $5, $6, $7, at, at, $8, $9 \
+         FROM (SELECT ($8::date + time '11:00') AT TIME ZONE $10 AS at) scanned",
+    )
+    .bind(Uuid::new_v4())
+    .bind(secrets::token_hash(&secrets::random_token()))
+    .bind(staff_id)
+    .bind(student)
+    .bind(amount as i64)
+    .bind(mention)
+    .bind(topic)
+    .bind(day)
+    .bind(&row.hash)
+    .bind(&settings.time_zone)
+    .execute(&state.db)
+    .await?;
+    Ok(row.is_included())
 }
 
 #[cfg(test)]
@@ -454,11 +613,26 @@ mod tests {
     }
 
     #[test]
-    fn demo_distributions_fit_in_the_default_quota() {
-        let per_staff: u64 = DISTRIBUTIONS
+    fn demo_staff_keep_fifty_epc_to_try_things() {
+        let distributed: u64 = DISTRIBUTIONS
             .iter()
             .map(|(_, amount, count, _)| amount * *count as u64)
             .sum();
-        assert!(per_staff * UNITS_PER_EPC <= Settings::development().default_mint_quota);
+        let shares = SHARES.len().div_ceil(STAFF) as u64 * SHARE_EPC;
+        // Enough to validate the first student's fifth day in a row, bonus included.
+        assert!(
+            (distributed + shares + 50) * UNITS_PER_EPC
+                <= Settings::development().default_mint_quota
+        );
+    }
+
+    #[test]
+    fn demo_shares_use_known_mentions_and_students() {
+        for (student, days_ago, topic, mention) in SHARES {
+            assert!(student < STUDENTS);
+            assert!(days_ago >= 1);
+            assert!(!topic.is_empty() && topic.chars().count() <= shares::MAX_TOPIC_CHARS);
+            assert!(mention.is_none_or(|m| shares::badges::MENTIONS.contains(&m)));
+        }
     }
 }

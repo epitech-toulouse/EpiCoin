@@ -27,7 +27,7 @@ import {
   formatEpc,
   fullName,
   parseEpc,
-  REASON_CODES,
+  DISTRIBUTION_REASONS,
   REASON_LABELS,
 } from '../../lib/format';
 import type { Cohort, Distribution, Paged, Quota, ReasonCode, Student } from '../../lib/types';
@@ -343,7 +343,7 @@ export function DistributePage() {
               touch();
             }}
           >
-            {REASON_CODES.map((code) => (
+            {DISTRIBUTION_REASONS.map((code) => (
               <option key={code} value={code}>
                 {REASON_LABELS[code]}
               </option>

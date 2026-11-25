@@ -42,7 +42,8 @@ export type ReasonCode =
   | 'event'
   | 'campus_life'
   | 'challenge'
-  | 'other';
+  | 'other'
+  | 'knowledge_share';
 
 export interface HistoryLine {
   tx_hash: string;
@@ -153,6 +154,130 @@ export interface AdminTransfer {
   sender_name: string | null;
   recipient_name: string | null;
   created_at: string;
+}
+
+// --- Knowledge shares ("Partages") ------------------------------------------------------
+
+export interface ShareTier {
+  days: number;
+  /** In units. */
+  bonus: number;
+}
+
+export interface ShareSettings {
+  /** Suggested amount of a share, in units. */
+  standard: number;
+  max_amount: number;
+  qr_seconds: number;
+  time_zone: string;
+  /** ISO weekdays the campus is open: 1 = Monday … 7 = Sunday. */
+  weekdays: number[];
+  /** `YYYY-MM-DD`. */
+  closures: string[];
+  tiers: ShareTier[];
+  daily_limit: number | null;
+}
+
+/** A freshly generated QR code. The secret is in the fragment of `link`. */
+export interface NewShare {
+  id: string;
+  link: string;
+  /** `size × size` modules, row by row, `1` for dark. */
+  qr: { size: number; modules: string };
+  amount: number;
+  mention: string | null;
+  topic: string;
+  expires_in: number;
+}
+
+export type ShareStatus = 'open' | 'expired' | 'invalidated' | 'claimed' | 'cancelled';
+
+/** A share as staff and admins see it. */
+export interface ManagedShare {
+  id: string;
+  status: ShareStatus;
+  reward_status: RewardStatus | null;
+  amount: number;
+  bonus: number;
+  streak_days: number | null;
+  mention: string | null;
+  topic: string;
+  staff_id: string | null;
+  staff_name: string | null;
+  student_id: string | null;
+  student_name: string | null;
+  expires_in: number;
+  created_at: string;
+  claimed_at: string | null;
+  cancelled_at: string | null;
+  cancel_reason: string;
+}
+
+export interface SharePreview {
+  amount: number;
+  mention: string | null;
+  topic: string;
+  staff_name: string | null;
+  expires_in: number;
+}
+
+export interface ShareClaim {
+  amount: number;
+  bonus: number;
+  streak_days: number | null;
+  mention: string | null;
+  staff_name: string | null;
+  reward_status: RewardStatus;
+  tx_hash: string;
+}
+
+export interface EarnedBadge {
+  code: string;
+  obtained_at: string;
+  count: number;
+}
+
+export interface MyShare {
+  id: string;
+  topic: string;
+  amount: number;
+  bonus: number;
+  streak_days: number | null;
+  mention: string | null;
+  staff_name: string | null;
+  claimed_at: string;
+  reward_status: 'pending' | 'included';
+  cancelled_at: string | null;
+  cancel_reason: string;
+}
+
+export interface MyShares {
+  today: string;
+  progress: { current: number; best: number; next: ShareTier | null; today_counted: boolean };
+  /** EPC earned through valid shares, bonuses included, in units. */
+  total: number;
+  shares: number;
+  rank: number | null;
+  hidden_from_ranking: boolean;
+  badges: EarnedBadge[];
+  recent: MyShare[];
+}
+
+export interface RankingLine {
+  rank: number;
+  /** Admins only. */
+  user_id: string | null;
+  name: string;
+  promo: string;
+  total: number;
+  shares: number;
+  legend: boolean;
+  me: boolean;
+}
+
+export interface Ranking {
+  items: RankingLine[];
+  me: { rank: number; total: number; shares: number } | null;
 }
 
 /** What shows a "!" in the menu: news for students, to-dos for the others. */

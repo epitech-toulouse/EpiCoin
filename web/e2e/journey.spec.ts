@@ -393,6 +393,56 @@ test('a student sends EPC to a classmate, and the admin sees it', async () => {
   await expect(admin.getByRole('cell', { name: 'Merci pour ton aide !' })).toBeVisible();
 });
 
+test('a student teaches a staff member something and scans the QR code', async ({ browser }) => {
+  await staff.getByRole('link', { name: 'Valider un partage' }).click();
+  await staff.getByLabel(/^Montant en EPC/).fill('12');
+  await staff.getByText('Life Hack').click();
+  await staff.getByLabel('Sujet partagé · facultatif').fill('Git bisect pour trouver un bug');
+  const [created] = await Promise.all([
+    staff.waitForResponse(
+      (response) => response.url().endsWith('/api/staff/shares') && response.request().method() === 'POST',
+    ),
+    staff.getByRole('button', { name: 'Générer le QR code' }).click(),
+  ]);
+  await expect(staff.getByRole('img', { name: /QR code du partage de 12/ })).toBeVisible();
+  const { link } = (await created.json()) as { link: string };
+  expect(link).toMatch(/\/partage#token=[0-9a-f]{64}$/);
+
+  // The phone that scans it is not logged in: the login screen comes first, then the share.
+  const context = await browser.newContext({ viewport: { width: 375, height: 700 } });
+  const phone = await context.newPage();
+  await phone.goto(link);
+  await expect(phone).toHaveURL(/\/connexion$/);
+  await phone.getByLabel('Adresse email').fill('ada.lovelace@epitech.eu');
+  await phone.getByLabel('Mot de passe').fill(PASSWORD);
+  await phone.getByRole('button', { name: 'Se connecter' }).click();
+  await expect(phone).toHaveURL(/\/partages\/recuperer$/);
+  await expect(phone.getByText('Git bisect pour trouver un bug')).toBeVisible();
+  await phone.getByRole('button', { name: 'Récupérer mes EPC' }).click();
+  await expect(phone.getByTestId('share-claimed')).toHaveText(/^\+12\s*EPC$/);
+  await context.close();
+
+  // The staff member's screen sees it at once; the student finds it in their space.
+  await expect(staff.getByText(/Ada Lovelace a reçu 12\s*EPC/)).toBeVisible();
+  await student.getByRole('link', { name: 'Partages' }).click();
+  await expect(student.getByRole('cell', { name: /Git bisect pour trouver un bug/ })).toBeVisible();
+  await student.getByRole('tab', { name: /Badges/ }).click();
+  await expect(student.getByText(/Obtenu le/).first()).toBeVisible();
+  await student.getByRole('tab', { name: 'Classement' }).click();
+  await expect(student.getByRole('cell', { name: /Ada L\./ })).toBeVisible();
+  await student.getByRole('link', { name: 'Mon solde' }).click();
+  await expect(student.getByTestId('balance')).toHaveText(/^47\s*EPC$/);
+
+  // The administrator can take it out of the ranking; the EPC stay.
+  await admin.goto('/admin/partages');
+  await admin.getByRole('button', { name: 'Annuler', exact: true }).click();
+  await admin.getByLabel('Justification').fill('Partage déjà validé hier');
+  await admin.getByRole('button', { name: 'Annuler le partage' }).click();
+  await expect(admin.getByText(/Partage déjà validé hier/)).toBeVisible();
+  await student.reload();
+  await expect(student.getByTestId('balance')).toHaveText(/^47\s*EPC$/);
+});
+
 test('the interface is usable on a phone', async ({ browser }) => {
   const context = await browser.newContext({ viewport: { width: 375, height: 700 } });
   const phone = await context.newPage();
@@ -412,9 +462,9 @@ test('the interface is usable on a phone', async ({ browser }) => {
 
   // Wide tables scroll inside their frame: no page, whoever the user, scrolls sideways.
   const pages: [string, string[]][] = [
-    ['ada.lovelace@epitech.eu', ['/', '/panier', '/commandes']],
-    ['admin@epitech.eu', ['/admin', '/admin/utilisateurs', '/admin/explorateur', '/admin/audit', '/gestion/produits', '/gestion/commandes']],
-    ['alan.turing@epitech.eu', ['/distribuer', '/distributions']],
+    ['ada.lovelace@epitech.eu', ['/', '/panier', '/commandes', '/partages']],
+    ['admin@epitech.eu', ['/admin', '/admin/utilisateurs', '/admin/explorateur', '/admin/audit', '/admin/partages', '/gestion/produits', '/gestion/commandes']],
+    ['alan.turing@epitech.eu', ['/distribuer', '/distributions', '/gestion/partages']],
   ];
   for (const [email, routes] of pages) {
     await context.clearCookies();

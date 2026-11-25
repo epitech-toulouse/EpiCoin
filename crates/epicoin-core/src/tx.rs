@@ -37,10 +37,12 @@ pub enum ReasonCode {
     CampusLife = 4,
     Challenge = 5,
     Other = 6,
+    /// A knowledge share validated by a staff member (QR code scanned by the student).
+    KnowledgeShare = 7,
 }
 
 impl ReasonCode {
-    pub const ALL: [ReasonCode; 7] = [
+    pub const ALL: [ReasonCode; 8] = [
         ReasonCode::Participation,
         ReasonCode::PeerHelp,
         ReasonCode::OutstandingProject,
@@ -48,6 +50,7 @@ impl ReasonCode {
         ReasonCode::CampusLife,
         ReasonCode::Challenge,
         ReasonCode::Other,
+        ReasonCode::KnowledgeShare,
     ];
 }
 

@@ -47,6 +47,13 @@ export function formatDate(value: string | number): string {
   return dateOnly.format(new Date(value));
 }
 
+/** `125` → "2 min 05 s", `40` → "40 s". */
+export function formatSeconds(seconds: number): string {
+  const minutes = Math.floor(seconds / 60);
+  const rest = seconds % 60;
+  return minutes > 0 ? `${minutes} min ${String(rest).padStart(2, '0')} s` : `${rest} s`;
+}
+
 export const REASON_LABELS: Record<ReasonCode, string> = {
   participation: 'Participation',
   peer_help: 'Entraide',
@@ -55,9 +62,13 @@ export const REASON_LABELS: Record<ReasonCode, string> = {
   campus_life: 'Vie du campus',
   challenge: 'Défi',
   other: 'Autre',
+  knowledge_share: 'Partage de connaissance',
 };
 
 export const REASON_CODES = Object.keys(REASON_LABELS) as ReasonCode[];
+
+/** The reasons a staff member picks by hand: knowledge shares are paid by their QR code. */
+export const DISTRIBUTION_REASONS = REASON_CODES.filter((code) => code !== 'knowledge_share');
 
 export function reasonLabel(code: string | null | undefined): string {
   return (code && REASON_LABELS[code as ReasonCode]) || 'Sans motif';

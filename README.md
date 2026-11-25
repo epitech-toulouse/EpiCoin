@@ -1,7 +1,9 @@
 # EpiCoin
 
 Monnaie virtuelle interne d'un campus Epitech. Les encadrants récompensent les étudiants en
-EpiCoins (EPC), que ceux-ci dépensent dans une petite boutique en ligne.
+EpiCoins (EPC), que ceux-ci dépensent dans une petite boutique en ligne. Défis, échanges entre
+étudiants et **partages de connaissances** (« Apprends-nous quelque chose ! » : un QR code à
+scanner, des séries de jours, des badges et un classement) font vivre la monnaie.
 
 Les EPC vivent sur une **blockchain privée** écrite en Rust : chaque distribution, achat et
 remboursement est une transaction signée, incluse dans un bloc, vérifiable par n'importe qui
@@ -57,7 +59,7 @@ la sauvegarde des clés générées, puis la création du premier administrateur
 | Document | Pour qui |
 |---|---|
 | [Guide d'administration](docs/guide-admin.md) | installation, genèse, import des étudiants, encadrants, sauvegardes, rotation des clés |
-| [Guide de l'encadrant](docs/guide-encadrant.md) | distribuer des EPC, proposer des défis |
+| [Guide de l'encadrant](docs/guide-encadrant.md) | distribuer des EPC, proposer des défis, valider un partage |
 | [Modèle de menace](docs/modele-de-menace.md) | ce qui est protégé, contre quoi, et les risques acceptés |
 | [Décisions techniques](docs/DECISIONS.md) | les choix qui ne vont pas de soi, et pourquoi |
 | [CLAUDE.md](CLAUDE.md) | architecture et conventions, pour qui modifie le code |
